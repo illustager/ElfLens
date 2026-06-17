@@ -42,7 +42,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                     .Contains(pc, StringComparison.OrdinalIgnoreCase) == true;
                 if (isCur != line.IsCurrent) changed = true;
                 if (isCur) foundName = fb.Name;
-                newInsts.Add(new HighlightedLine(line.Tokens, isCur));
+                newInsts.Add(new HighlightedLine(line.Tokens, isCur, line.IsBreakpoint));
             }
             if (changed)
                 FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
@@ -170,7 +170,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                     var fb = FunctionBlocks[bi];
                     fb.IsExpanded = false;
                     var newInsts = fb.Instructions
-                        .Select(inst => new HighlightedLine(inst.Tokens, false))
+                        .Select(inst => new HighlightedLine(inst.Tokens, false, inst.IsBreakpoint))
                         .ToList();
                     FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
                 }
