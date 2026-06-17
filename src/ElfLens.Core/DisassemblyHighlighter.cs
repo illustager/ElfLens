@@ -26,8 +26,10 @@ public static class DisassemblyHighlighter
 
     private static readonly Regex FuncRx =
         new(@"^([0-9a-f]+)\s+<([^>]+)>:$", RegexOptions.Compiled);
+    // Split instruction line into: [address] [bytes + spaces] [mnemonic] [rest]
+    // Preserve whitespace between columns for alignment
     private static readonly Regex InstRx = new(
-        @"^(\s*[0-9a-f]+:\s+)?((?:[0-9a-f]{2}\s)+)\s+([a-z]\w*)(\s+.*)?$",
+        @"^(\s*[0-9a-f]+:\s+)?((?:[0-9a-f]{2}\s)+)(\s+)([a-z]\w*)(\s*)(.*)?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex RegRx = new(
         @"%(?:[re]?[abcd]x|[re]?[sd]i|[re]?[sb]p|[re]?ip|[re]?[a-d][lh]|[re]?s[ip]l|[re]?bpl|[re]?dil|[cr]r[0-9]|dr[0-7]|st\(?[0-7]\)?|[xyz]?mm[0-9]|xmm1[0-5]|[xy]mm1[0-5])",
@@ -54,16 +56,19 @@ public static class DisassemblyHighlighter
         var im = InstRx.Match(line);
         if (im.Success)
         {
+            // Groups: 1=address, 2=bytes, 3=space, 4=mnemonic, 5=space, 6=operands
             if (im.Groups[1].Success)
                 t.Add(new Token(im.Groups[1].Value, CAddr));
             if (im.Groups[2].Success)
                 t.Add(new Token(im.Groups[2].Value, CBytes));
-
-            var mnem = im.Groups[3].Value.ToLower();
+            if (im.Groups[3].Success)
+                t.Add(new Token(im.Groups[3].Value, CDef));
+            var mnem = im.Groups[4].Value.ToLower();
             t.Add(new Token(mnem, MnemColor(mnem)));
-
-            if (im.Groups[4].Success)
-                TokenizeOps(im.Groups[4].Value, t);
+            if (im.Groups[5].Success)
+                t.Add(new Token(im.Groups[5].Value, CDef));
+            if (im.Groups[6].Success)
+                TokenizeOps(im.Groups[6].Value, t);
         }
         else
         {
