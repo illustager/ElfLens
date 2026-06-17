@@ -218,18 +218,35 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         return "#B0BEC5";
     }
 
+    // Register names (GDB format without % prefix)
+    private static readonly HashSet<string> RegNames = new()
+    {
+        "rax","rbx","rcx","rdx","rsi","rdi","rbp","rsp","rip",
+        "eax","ebx","ecx","edx","esi","edi","ebp","esp","eip",
+        "ax","bx","cx","dx","si","di","bp","sp",
+        "al","ah","bl","bh","cl","ch","dl","dh",
+        "r8","r9","r10","r11","r12","r13","r14","r15",
+        "r8d","r9d","r10d","r11d","r12d","r13d","r14d","r15d",
+        "xmm0","xmm1","xmm2","xmm3","xmm4","xmm5","xmm6","xmm7",
+        "ymm0","ymm1","ymm2","ymm3",
+        "cs","ds","es","fs","gs","ss",
+        "st0","st1","st2","st3","st4","st5","st6","st7",
+        "cr0","cr2","cr3","cr4","dr0","dr1","dr2","dr3","dr6","dr7",
+        "mm0","mm1","mm2","mm3","mm4","mm5","mm6","mm7",
+    };
+
     private static void TokenizeOperands(string text, List<Token> tokens)
     {
         int p = 0;
         while (p < text.Length)
         {
-            // Register: %rax, %rsp, etc.
-            var regM = Regex.Match(text[p..], @"^%[a-z][a-z0-9]*");
-            if (regM.Success)
+            // Angle bracket ref: <name+offset> or <name@plt>
+            var refM = Regex.Match(text[p..], @"^<[^>]+>");
+            if (refM.Success)
             {
-                if (p < regM.Index + p) tokens.Add(new Token(text[p..(p + regM.Index)], "#B0BEC5"));
-                tokens.Add(new Token(regM.Value, "#CE93D8"));
-                p += regM.Index + regM.Length;
+                if (p < refM.Index + p) tokens.Add(new Token(text[p..(p + refM.Index)], "#B0BEC5"));
+                tokens.Add(new Token(refM.Value, "#4FC3F7"));
+                p += refM.Index + refM.Length;
                 continue;
             }
             // Hex: 0x...
@@ -241,18 +258,18 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 p += hexM.Index + hexM.Length;
                 continue;
             }
-            // Angle bracket ref: <name>
-            var refM = Regex.Match(text[p..], @"^<[^>]+>");
-            if (refM.Success)
+            // Register (GDB format, no %): match known register names
+            var wordM = Regex.Match(text[p..], @"^[a-z][a-z0-9]*");
+            if (wordM.Success && RegNames.Contains(wordM.Value.ToLower()))
             {
-                if (p < refM.Index + p) tokens.Add(new Token(text[p..(p + refM.Index)], "#B0BEC5"));
-                tokens.Add(new Token(refM.Value, "#4FC3F7"));
-                p += refM.Index + refM.Length;
+                if (p < wordM.Index + p) tokens.Add(new Token(text[p..(p + wordM.Index)], "#B0BEC5"));
+                tokens.Add(new Token(wordM.Value, "#CE93D8"));
+                p += wordM.Index + wordM.Length;
                 continue;
             }
             // Advance to next special char
             int next = text.Length;
-            foreach (var rx in new[] { @"%[a-z][a-z0-9]*", @"0x[0-9a-f]+", @"<[^>]+>" })
+            foreach (var rx in new[] { @"<[^>]+>", @"0x[0-9a-f]+", @"[a-z][a-z0-9]*" })
             {
                 var m2 = Regex.Match(text[p..], rx);
                 if (m2.Success && m2.Index + p < next) next = m2.Index + p;
