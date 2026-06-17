@@ -138,7 +138,10 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                     : await Capture($"disassemble /r 0x{pcAddr}");
                 var block = ParseGdbBlock(asm, funcName, pcAddr);
                 if (block != null)
+                {
+                    block.IsExpanded = true;
                     FunctionBlocks.Add(block);
+                }
             }
 
             CurrentPc = pcAddr;
