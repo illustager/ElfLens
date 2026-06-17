@@ -37,7 +37,7 @@ public partial class ShellPanelViewModel : ViewModelBase
             _session = await _sshService.CreateShellSessionAsync();
             if (_session != null)
             {
-                AppendOutput(Prompt);
+                AppendOutput(_session.Prompt + " ");
                 _session.OnOutput += chunk =>
                 {
                     uiCtx?.Post(_ => AppendOutput(chunk), null);
