@@ -24,6 +24,13 @@ public partial class FileInfoPanelViewModel : PanelViewModel
     public ObservableCollection<KeyValueItem> ElfHeaders { get; } = new();
     public ObservableCollection<SectionItem> Sections { get; } = new();
 
+    // Computed column widths for section table
+    [ObservableProperty] private double _colNameWidth = 80;
+    [ObservableProperty] private double _colTypeWidth = 60;
+    [ObservableProperty] private double _colAddrWidth = 100;
+    [ObservableProperty] private double _colSizeWidth = 60;
+    [ObservableProperty] private double _colFlagsWidth = 60;
+
     public FileInfoPanelViewModel(ISshService sshService)
     {
         _sshService = sshService;
@@ -64,24 +71,29 @@ public partial class FileInfoPanelViewModel : PanelViewModel
     private void ParseSections(string output)
     {
         Sections.Clear();
-        // Parse section table: lines starting with whitespace + [Nr] or a number
-        // Format: "  [ 0]  .interp  PROGBITS  0000000000000318  ..."
         foreach (var line in output.Split('\n'))
         {
-            // readelf -SW format: [Nr] Name Type Address Off Size ES Flg Lk Inf Al
             var m = Regex.Match(line, @"^\s*\[\s*\d+\]\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)$");
             if (m.Success)
             {
                 Sections.Add(new SectionItem(
-                    m.Groups[1].Value,  // Name
-                    m.Groups[2].Value,  // Type
-                    m.Groups[3].Value,  // Address
-                    m.Groups[4].Value,  // Offset
-                    m.Groups[5].Value,  // Size
-                    m.Groups[7].Value   // Flags
-                ));
+                    m.Groups[1].Value, m.Groups[2].Value, m.Groups[3].Value,
+                    m.Groups[4].Value, m.Groups[5].Value, m.Groups[7].Value));
             }
         }
+        ComputeSectionColumnWidths();
+    }
+
+    private void ComputeSectionColumnWidths()
+    {
+        if (Sections.Count == 0) return;
+        const double charWidth = 6.8; // Cascadia Code 11px approximate
+        const double padding = 12;
+        ColNameWidth = Math.Max(Sections.Max(s => s.Name.Length) * charWidth + padding, 60);
+        ColTypeWidth = Math.Max(Sections.Max(s => s.Type.Length) * charWidth + padding, 60);
+        ColAddrWidth = Math.Max(Sections.Max(s => s.Address.Length) * charWidth + padding, 80);
+        ColSizeWidth = Math.Max(Sections.Max(s => s.Size.Length) * charWidth + padding, 50);
+        ColFlagsWidth = Math.Max(Sections.Max(s => s.Flags.Length) * charWidth + padding, 50);
     }
 }
 
