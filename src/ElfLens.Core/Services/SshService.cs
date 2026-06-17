@@ -38,19 +38,28 @@ public class SshService : ISshService, IDisposable
         }
     }
 
-    public Task<ShellSession?> CreateShellSessionAsync()
+    public async Task<ShellSession?> CreateShellSessionAsync()
     {
         if (_client is not { IsConnected: true })
-            return Task.FromResult<ShellSession?>(null);
+            return null;
 
         try
         {
-            return Task.FromResult<ShellSession?>(new ShellSession(_client));
+            var shellStream = await Task.Run(() =>
+                _client.CreateShellStream(
+                    terminalName: "xterm-256color",
+                    columns: 200,
+                    rows: 40,
+                    width: 800,
+                    height: 600,
+                    bufferSize: 65536));
+
+            return new ShellSession(shellStream);
         }
         catch (Exception ex)
         {
             System.Diagnostics.Debug.WriteLine($"[ElfLens] Failed to create shell session: {ex.Message}");
-            return Task.FromResult<ShellSession?>(null);
+            return null;
         }
     }
 
