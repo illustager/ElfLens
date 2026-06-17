@@ -8,10 +8,9 @@ public partial class ShellPanelView : UserControl
     public ShellPanelView()
     {
         InitializeComponent();
-        OutputBox.PropertyChanged += (_, e) =>
+        OutputBox.TextChanged += (_, _) =>
         {
-            if (e.Property == TextBox.TextProperty)
-                OutputBox.CaretIndex = OutputBox.Text?.Length ?? 0;
+            OutputBox.CaretIndex = int.MaxValue;
         };
     }
 
