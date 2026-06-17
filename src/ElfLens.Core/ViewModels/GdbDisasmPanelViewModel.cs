@@ -34,6 +34,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
 
     private void UpdateHighlight(string pc)
     {
+        FunctionItem? found = null;
         for (int bi = 0; bi < FunctionBlocks.Count; bi++)
         {
             var fb = FunctionBlocks[bi];
@@ -45,15 +46,22 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 var isCur = first?.Text.Trim()
                     .Contains(pc, StringComparison.OrdinalIgnoreCase) == true;
                 if (isCur != line.IsCurrent) changed = true;
+                if (isCur) found = fb;
                 newInsts.Add(new HighlightedLine(line.Tokens, isCur));
             }
             if (changed)
                 FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
         }
+        if (found != null)
+        {
+            found.IsExpanded = true;
+            ScrollToBlock?.Invoke(found);
+        }
     }
 
     public ObservableCollection<FunctionItem> FunctionBlocks { get; } = new();
     public event Action<ShellSession?, string>? SessionChanged;
+    public event Action<FunctionItem>? ScrollToBlock;
 
     public GdbDisasmPanelViewModel(ISshService sshService, DisassemblyPanelViewModel staticDisasm)
     {
