@@ -103,7 +103,16 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
     [RelayCommand]
     private async Task ContinueAsync() => await GdbStep("continue");
     [RelayCommand]
-    private async Task StopAsync() => await GdbSend("kill");
+    private async Task StopAsync()
+    {
+        if (_gdbSession == null) return;
+        await _gdbSession.SendCommandAsync("kill");
+        await Task.Delay(200);
+        _gdbSession.Dispose();
+        _gdbSession = null;
+        IsDebugging = false;
+        await RefreshAsync();
+    }
     [RelayCommand]
     private async Task RestartAsync() => await GdbSend("run");
 

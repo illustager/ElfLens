@@ -6,32 +6,45 @@
              x:Class="ElfLens.Views.DisassemblyPanelView"
              x:DataType="vm:DisassemblyPanelViewModel">
 
-    <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="4">
-        <!-- Toolbar: static mode -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4"
-                    IsVisible="{Binding IsDebugging, Converter={x:Static BoolConverters.Not}}">
-            <Button Content="Refresh" Command="{Binding RefreshCommand}"
-                    Padding="6,2" FontSize="11"
-                    IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
-            <Button Content="Start Debugging" Command="{Binding StartDebuggingCommand}"
-                    Padding="6,2" FontSize="11"
-                    IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
-        </StackPanel>
+    <UserControl.Styles>
+        <Style Selector="Button.debug">
+            <Setter Property="Background" Value="#2A3A2A" />
+            <Setter Property="Foreground" Value="#81C784" />
+        </Style>
+        <Style Selector="Button.stop">
+            <Setter Property="Background" Value="#3A2A2A" />
+            <Setter Property="Foreground" Value="#EF5350" />
+        </Style>
+    </UserControl.Styles>
 
-        <!-- Toolbar: dynamic mode -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4"
-                    IsVisible="{Binding IsDebugging}">
-            <Button Content="Step Into" Command="{Binding StepIntoCommand}"
-                    Padding="6,2" FontSize="11" />
-            <Button Content="Step Over" Command="{Binding StepOverCommand}"
-                    Padding="6,2" FontSize="11" />
-            <Button Content="Continue" Command="{Binding ContinueCommand}"
-                    Padding="6,2" FontSize="11" />
-            <Button Content="Stop" Command="{Binding StopCommand}"
-                    Padding="6,2" FontSize="11" />
-            <Button Content="Restart" Command="{Binding RestartCommand}"
-                    Padding="6,2" FontSize="11" />
-        </StackPanel>
+    <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="4">
+        <!-- Toolbar -->
+        <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
+            <!-- Static buttons -->
+            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4"
+                        IsVisible="{Binding IsDebugging, Converter={x:Static BoolConverters.Not}}">
+                <Button Content="Refresh" Command="{Binding RefreshCommand}"
+                        Padding="6,2" FontSize="11"
+                        IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
+                <Button Content="Start Debugging" Command="{Binding StartDebuggingCommand}"
+                        Padding="6,2" FontSize="11"
+                        IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
+            </StackPanel>
+            <!-- Debug buttons, right-aligned, distinct style -->
+            <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
+                        IsVisible="{Binding IsDebugging}">
+                <Button Content="Step Into" Command="{Binding StepIntoCommand}"
+                        Padding="6,2" FontSize="11" Classes="debug" />
+                <Button Content="Step Over" Command="{Binding StepOverCommand}"
+                        Padding="6,2" FontSize="11" Classes="debug" />
+                <Button Content="Continue" Command="{Binding ContinueCommand}"
+                        Padding="6,2" FontSize="11" Classes="debug" />
+                <Button Content="Restart" Command="{Binding RestartCommand}"
+                        Padding="6,2" FontSize="11" Classes="debug" />
+                <Button Content="Stop" Command="{Binding StopCommand}"
+                        Padding="6,2" FontSize="11" Classes="stop" />
+            </StackPanel>
+        </Grid>
 
         <TextBlock Grid.Row="1" Text="{Binding FunctionCount}" FontSize="12"
                    Opacity="0.7" Margin="0,2,0,0" />
