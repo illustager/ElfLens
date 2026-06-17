@@ -7,6 +7,8 @@ namespace ElfLens.Core.ViewModels;
 
 public partial class ConnectPageViewModel : ViewModelBase
 {
+    private readonly Action<string>? _onConnected;
+
     [ObservableProperty]
     private string _host = string.Empty;
 
@@ -31,9 +33,15 @@ public partial class ConnectPageViewModel : ViewModelBase
     [ObservableProperty]
     private string? _errorMessage;
 
+    public ConnectPageViewModel() : this(null) { }
+
+    public ConnectPageViewModel(Action<string>? onConnected)
+    {
+        _onConnected = onConnected;
+    }
+
     partial void OnUsePasswordAuthChanged(bool value)
     {
-        // Clear the inactive auth method's value
         if (value)
             KeyFilePath = null;
         else
@@ -65,7 +73,6 @@ public partial class ConnectPageViewModel : ViewModelBase
 
         ErrorMessage = null;
 
-        // Step 1: just log connection info to debug output
         var authInfo = info.AuthMethod == AuthMethod.Password
             ? $"password (length={info.Password?.Length ?? 0})"
             : $"key file: {info.KeyFilePath}";
@@ -74,5 +81,7 @@ public partial class ConnectPageViewModel : ViewModelBase
             $"[ElfLens] Connecting to {info.Username}@{info.Host}:{info.Port} using {authInfo}");
         System.Diagnostics.Debug.WriteLine(
             $"[ElfLens] Target binary: {info.TargetBinaryPath}");
+
+        _onConnected?.Invoke(info.Host);
     }
 }

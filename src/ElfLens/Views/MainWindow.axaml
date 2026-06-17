@@ -3,17 +3,120 @@
         xmlns:vm="using:ElfLens.Core.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="520" d:DesignHeight="560"
+        mc:Ignorable="d" d:DesignWidth="1200" d:DesignHeight="800"
         x:Class="ElfLens.Views.MainWindow"
-        x:DataType="vm:ConnectPageViewModel"
+        x:DataType="vm:MainViewModel"
         Title="ElfLens">
 
     <Design.DataContext>
-        <vm:ConnectPageViewModel/>
+        <vm:MainViewModel/>
     </Design.DataContext>
 
-    <ScrollViewer>
-        <ContentControl Content="{Binding}" />
-    </ScrollViewer>
+    <Grid RowDefinitions="Auto,*">
 
+        <!-- Status Bar -->
+        <Border Grid.Row="0" Padding="12,6"
+                Background="{DynamicResource SystemAltHighBrush}">
+            <Grid ColumnDefinitions="Auto,*">
+                <StackPanel Orientation="Horizontal" Spacing="8">
+                    <!-- Connection indicator -->
+                    <Ellipse Width="10" Height="10" Fill="#4CAF50"
+                             IsVisible="{Binding IsConnected}" />
+                    <Ellipse Width="10" Height="10" Fill="#F44336"
+                             IsVisible="{Binding IsConnected, Converter={x:Static BoolConverters.Not}}" />
+                    <TextBlock Text="{Binding ConnectionStatus}"
+                               FontSize="12" VerticalAlignment="Center" />
+                </StackPanel>
+                <TextBlock Grid.Column="1" Text="ElfLens"
+                           FontSize="12" Foreground="{DynamicResource SystemAltHighBrush}"
+                           HorizontalAlignment="Right" VerticalAlignment="Center" />
+            </Grid>
+        </Border>
+
+        <!-- Connect Page (visible when not connected) -->
+        <ScrollViewer Grid.Row="1"
+                      IsVisible="{Binding IsConnected, Converter={x:Static BoolConverters.Not}}">
+            <ContentControl Content="{Binding ConnectPage}" />
+        </ScrollViewer>
+
+        <!-- Workspace (visible when connected) -->
+        <Grid Grid.Row="1"
+              IsVisible="{Binding IsConnected}"
+              ColumnDefinitions="220,4,*,4,220"
+              RowDefinitions="*,4,180">
+
+            <!-- Left Tool Panel -->
+            <Border Grid.Column="0" Grid.Row="0"
+                    Background="{DynamicResource SystemAltMediumLowBrush}"
+                    Padding="8">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="TOOLS" FontSize="10"
+                               Foreground="{DynamicResource SystemBaseMediumColorBrush}" />
+                    <TextBlock Text="Panels will appear here"
+                               FontSize="12" Opacity="0.6"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <!-- Left Splitter -->
+            <GridSplitter Grid.Column="1" Grid.Row="0"
+                          Width="4" Background="Transparent"
+                          HorizontalAlignment="Stretch" />
+
+            <!-- Center Document Area -->
+            <Border Grid.Column="2" Grid.Row="0"
+                    Background="{DynamicResource SystemAltHighBrush}"
+                    Padding="12">
+                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
+                    <TextBlock Text="ElfLens" FontSize="24" FontWeight="Bold"
+                               Opacity="0.3" HorizontalAlignment="Center" />
+                    <TextBlock Text="Linux Binary Analysis Tool"
+                               FontSize="14" Opacity="0.3"
+                               HorizontalAlignment="Center" />
+                    <TextBlock Text="{Binding ConnectionHost}"
+                               FontSize="13" Opacity="0.4"
+                               HorizontalAlignment="Center" />
+                </StackPanel>
+            </Border>
+
+            <!-- Right Splitter -->
+            <GridSplitter Grid.Column="3" Grid.Row="0"
+                          Width="4" Background="Transparent"
+                          HorizontalAlignment="Stretch" />
+
+            <!-- Right Tool Panel -->
+            <Border Grid.Column="4" Grid.Row="0"
+                    Background="{DynamicResource SystemAltMediumLowBrush}"
+                    Padding="8">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="INSPECTOR" FontSize="10"
+                               Foreground="{DynamicResource SystemBaseMediumColorBrush}" />
+                    <TextBlock Text="Panels will appear here"
+                               FontSize="12" Opacity="0.6"
+                               TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <!-- Horizontal Splitter -->
+            <GridSplitter Grid.Column="0" Grid.ColumnSpan="5"
+                          Grid.Row="1" Height="4"
+                          Background="Transparent"
+                          HorizontalAlignment="Stretch" />
+
+            <!-- Bottom Output Panel -->
+            <Border Grid.Column="0" Grid.ColumnSpan="5"
+                    Grid.Row="2"
+                    Background="{DynamicResource SystemAltMediumLowBrush}"
+                    Padding="8">
+                <StackPanel Spacing="8">
+                    <TextBlock Text="OUTPUT" FontSize="10"
+                               Foreground="{DynamicResource SystemBaseMediumColorBrush}" />
+                    <TextBlock Text="Command output and logs will appear here"
+                               FontSize="12" Opacity="0.6" />
+                </StackPanel>
+            </Border>
+
+        </Grid>
+
+    </Grid>
 </Window>
