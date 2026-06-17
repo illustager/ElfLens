@@ -162,8 +162,10 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         if (_session == null) return "";
         var sb = new List<string>();
         var done = new TaskCompletionSource<bool>();
+        var collecting = false;
         void H(string c)
         {
+            if (!collecting) return;
             sb.Add(c);
             if (sb.Any(s => s.Contains("End of assembler dump.")) ||
                 sb.Sum(s => s.Length) > 50000)
@@ -171,6 +173,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         }
         _session.OnOutput += H;
         await _session.SendCommandAsync(cmd);
+        collecting = true;
         await Task.WhenAny(done.Task, Task.Delay(500));
         _session.OnOutput -= H;
         return string.Join("", sb);
