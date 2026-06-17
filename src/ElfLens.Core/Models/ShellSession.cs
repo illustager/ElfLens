@@ -50,10 +50,8 @@ public partial class ShellSession : IDisposable
         await _writeLock.WaitAsync(ct);
         try
         {
-            Drain();
             await _writer.WriteLineAsync(command.AsMemory(), ct);
             var raw = await ReadOutputAsync(ct);
-            Drain();
             DebugLog("RAW", raw);
             var result = Clean(raw);
             DebugLog("CLEAN", result);
@@ -112,8 +110,8 @@ public partial class ShellSession : IDisposable
                 if (n > 0) { sb.Append(Encoding.UTF8.GetString(buf, 0, n)); got = true; }
                 else break;
             }
-            if (got) idle = 0; else { idle++; if (idle >= 8 && sb.Length > 0) break; }
-            await Task.Delay(40, cts.Token);
+            if (got) idle = 0; else { idle++; if (idle >= 20 && sb.Length > 0) break; }
+            await Task.Delay(50, cts.Token);
         }
         return sb.ToString();
     }
