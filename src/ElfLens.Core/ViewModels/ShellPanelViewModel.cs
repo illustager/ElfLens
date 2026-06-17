@@ -47,7 +47,7 @@ public partial class ShellPanelViewModel : ViewModelBase
             if (_session != null)
             {
                 Prompt = _session.Prompt + " ";
-                AppendOutput("=== Shell session established ===\n\n");
+                AppendOutput($"{Prompt}");
             }
             else
             {
