@@ -2,7 +2,8 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ElfLens.Core.ViewModels"
              x:Class="ElfLens.Views.BreakpointPanelView"
-             x:DataType="vm:BreakpointPanelViewModel">
+             x:DataType="vm:BreakpointPanelViewModel"
+             x:Name="root">
 
     <Grid RowDefinitions="Auto,Auto,*" Margin="4">
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4" Margin="0,0,0,6">
@@ -25,7 +26,7 @@
                                 <Button Grid.Column="0" Padding="2,0" Background="Transparent"
                                         BorderThickness="0" FontSize="13" Width="22"
                                         Command="{Binding DataContext.ToggleCommand,
-                                            RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            ElementName=root}}"
                                         CommandParameter="{Binding .}">
                                     <Panel>
                                         <TextBlock Text="☐" Foreground="#EF5350"
@@ -45,7 +46,7 @@
                                         Background="Transparent" BorderThickness="0"
                                         Foreground="#EF5350"
                                         Command="{Binding DataContext.RemoveCommand,
-                                            RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                            ElementName=root}}"
                                         CommandParameter="{Binding .}" />
                             </Grid>
                         </Border>
