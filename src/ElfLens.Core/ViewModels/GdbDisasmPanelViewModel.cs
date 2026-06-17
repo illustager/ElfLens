@@ -64,14 +64,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
     [RelayCommand] private async Task StepIntoAsync() => await Step("stepi");
     [RelayCommand] private async Task StepOverAsync() => await Step("nexti");
     [RelayCommand] private async Task ContinueAsync() => await Step("continue");
-    [RelayCommand]
-    private async Task RestartAsync()
-    {
-        FunctionBlocks.Clear();
-        _lastFunc = "";
-        _staticDisasm.HighlightFunction(null, null);
-        await Step("run");
-    }
+    [RelayCommand] private async Task RestartAsync() => await Step("run");
 
     [RelayCommand]
     private async Task StopAsync()
@@ -114,22 +107,22 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
             var funcName = nameM.Success ? nameM.Groups[1].Value : "";
             CurrentFunction = funcName;
 
-            // Only disassemble when entering a new function
-            if (funcName != _lastFunc || string.IsNullOrEmpty(funcName))
+            // Add new function if not already in blocks
+            if (!FunctionBlocks.Any(f => f.Name == funcName))
             {
-                _lastFunc = funcName;
                 var asm = string.IsNullOrEmpty(pcAddr)
                     ? await Capture("disassemble /r")
                     : await Capture($"disassemble /r 0x{pcAddr}");
                 var block = ParseGdbBlock(asm, funcName, pcAddr);
                 if (block != null) FunctionBlocks.Add(block);
             }
+
             else
             {
                 // Same function — clear all then re-highlight current
                 ClearAllHighlights();
-                var last = FunctionBlocks.LastOrDefault();
-                if (last != null) HighlightInBlock(last, pcAddr);
+                var block = FunctionBlocks.FirstOrDefault(f => f.Name == funcName);
+                if (block != null) HighlightInBlock(block, pcAddr);
             }
 
             if (_staticDisasm.HasFunction(funcName))
