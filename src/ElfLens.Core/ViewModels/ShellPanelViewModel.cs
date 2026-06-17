@@ -46,6 +46,7 @@ public partial class ShellPanelViewModel : ViewModelBase
             _session = await _sshService.CreateShellSessionAsync();
             if (_session != null)
             {
+                Prompt = _session.Prompt + " ";
                 AppendOutput("=== Shell session established ===\n\n");
             }
             else
