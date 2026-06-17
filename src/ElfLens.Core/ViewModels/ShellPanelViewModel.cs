@@ -62,6 +62,7 @@ public partial class ShellPanelViewModel : ViewModelBase
         try
         {
             await _session.ExecuteCommandAsync(command, chunk => AppendOutput(chunk));
+            Prompt = _session.Prompt + " ";
         }
         catch (Exception ex) { AppendOutput($"!!! Error: {ex.Message}\n"); }
         finally { IsBusy = false; }
