@@ -10,8 +10,10 @@ using ElfLens.Core.Services;
 
 namespace ElfLens.Core.ViewModels;
 
-public partial class ShellPanelViewModel : ViewModelBase
+public partial class ShellPanelViewModel : PanelViewModel
 {
+    public override string Title => "Shell";
+    public override PanelZone Zone => PanelZone.Bottom;
     private readonly ISshService _sshService;
     private ShellSession? _session;
     private readonly List<string> _commandHistory = new();
