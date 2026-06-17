@@ -16,6 +16,7 @@ public partial class ShellPanelViewModel : ViewModelBase
     private readonly List<string> _commandHistory = new();
     private int _historyIndex = -1;
     private readonly StringBuilder _outputBuffer = new();
+    private string _lastPrompt = "";
 
     [ObservableProperty]
     private string _inputCommand = string.Empty;
@@ -37,9 +38,7 @@ public partial class ShellPanelViewModel : ViewModelBase
     [RelayCommand]
     private async Task InitializeAsync()
     {
-        if (_session != null)
-            return;
-
+        if (_session != null) return;
         IsBusy = true;
         try
         {
@@ -47,54 +46,40 @@ public partial class ShellPanelViewModel : ViewModelBase
             if (_session != null)
             {
                 Prompt = _session.Prompt + " ";
+                _lastPrompt = _session.Prompt;
                 AppendOutput($"{Prompt}");
             }
-            else
-            {
-                AppendOutput("!!! Failed to create shell session\n");
-            }
+            else AppendOutput("!!! Failed to create shell session\n");
         }
-        catch (Exception ex)
-        {
-            AppendOutput($"!!! Error: {ex.Message}\n");
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        catch (Exception ex) { AppendOutput($"!!! Error: {ex.Message}\n"); }
+        finally { IsBusy = false; }
     }
 
     [RelayCommand(CanExecute = nameof(CanExecuteCommand))]
     private async Task ExecuteCommandAsync()
     {
         var command = InputCommand.Trim();
-        if (string.IsNullOrEmpty(command))
-            return;
+        if (string.IsNullOrEmpty(command)) return;
 
         _commandHistory.Add(command);
         _historyIndex = _commandHistory.Count;
         InputCommand = string.Empty;
 
-        if (_session == null)
-        {
-            AppendOutput("!!! Shell not initialized\n");
-            return;
-        }
+        if (_session == null) { AppendOutput("!!! Shell not initialized\n"); return; }
 
         IsBusy = true;
         try
         {
-            var output = await _session.ExecuteCommandAsync(command);
-            AppendOutput(output);
+            var finalLine = await _session.ExecuteCommandAsync(command, line =>
+            {
+                // Each complete line arrives here in real-time
+                AppendOutput(line + "\n");
+            });
+
+            // finalLine is the last prompt — kept in buffer for next command continuity
         }
-        catch (Exception ex)
-        {
-            AppendOutput($"!!! Error: {ex.Message}\n");
-        }
-        finally
-        {
-            IsBusy = false;
-        }
+        catch (Exception ex) { AppendOutput($"!!! Error: {ex.Message}\n"); }
+        finally { IsBusy = false; }
     }
 
     private bool CanExecuteCommand() => !IsBusy && !string.IsNullOrWhiteSpace(InputCommand);
@@ -110,13 +95,8 @@ public partial class ShellPanelViewModel : ViewModelBase
         if (_commandHistory.Count == 0) return;
         _historyIndex = Math.Clamp(_historyIndex + direction, 0, _commandHistory.Count);
         InputCommand = _historyIndex < _commandHistory.Count
-            ? _commandHistory[_historyIndex]
-            : string.Empty;
+            ? _commandHistory[_historyIndex] : string.Empty;
     }
 
-    public void Cleanup()
-    {
-        _session?.Dispose();
-        _session = null;
-    }
+    public void Cleanup() { _session?.Dispose(); _session = null; }
 }

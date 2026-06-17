@@ -16,7 +16,6 @@ public partial class ShellSession : IDisposable
     private readonly ShellStream _shellStream;
     private readonly StreamWriter _writer;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
-    private const int ReadTimeoutMs = 10_000;
 
     public string Prompt { get; private set; } = "$ ";
 
@@ -45,17 +44,20 @@ public partial class ShellSession : IDisposable
         }
     }
 
-    public async Task<string> ExecuteCommandAsync(string command, CancellationToken ct = default)
+    /// <summary>
+    /// Executes a command and streams output lines to the callback in real-time.
+    /// Returns the final prompt line (if detected) for display continuity.
+    /// </summary>
+    public async Task<string> ExecuteCommandAsync(
+        string command,
+        Action<string> onLine,
+        CancellationToken ct = default)
     {
         await _writeLock.WaitAsync(ct);
         try
         {
             await _writer.WriteLineAsync(command.AsMemory(), ct);
-            var raw = await ReadOutputAsync(ct);
-            DebugLog("RAW", raw);
-            var result = Clean(raw);
-            DebugLog("CLEAN", result);
-            return result;
+            return await ReadLinesAsync(onLine, ct);
         }
         finally { _writeLock.Release(); }
     }
@@ -94,70 +96,82 @@ public partial class ShellSession : IDisposable
         }
     }
 
-    private async Task<string> ReadOutputAsync(CancellationToken ct)
+    private async Task<string> ReadLinesAsync(Action<string> onLine, CancellationToken ct)
     {
-        var sb = new StringBuilder();
+        var leftover = new StringBuilder();
         var buf = new byte[4096];
-        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        cts.CancelAfter(ReadTimeoutMs);
         int idle = 0;
-        while (!cts.IsCancellationRequested)
+        const int maxIdle = 3; // 150ms idle → command done
+        string? lastEmitted = null;
+        var recent = new HashSet<string>(); // dedup within this command
+        string? finalLine = null;
+
+        void Emit(string line)
         {
-            bool got = false;
+            // Consecutive duplicate? Replace previous (keeps last copy)
+            if (line == lastEmitted) return;
+
+            // Non-consecutive duplicate within this command?
+            if (!recent.Add(line)) return;
+
+            // Trim recent set to avoid unbounded growth
+            if (recent.Count > 50) recent.Clear();
+
+            lastEmitted = line;
+            finalLine = line;
+            onLine(line);
+        }
+
+        while (!ct.IsCancellationRequested)
+        {
+            bool gotData = false;
             while (_shellStream.DataAvailable)
             {
                 int n = _shellStream.Read(buf, 0, buf.Length);
-                if (n > 0) { sb.Append(Encoding.UTF8.GetString(buf, 0, n)); got = true; }
+                if (n > 0)
+                {
+                    leftover.Append(Encoding.UTF8.GetString(buf, 0, n));
+                    gotData = true;
+                }
                 else break;
             }
-            if (got) idle = 0; else { idle++; if (idle >= 20 && sb.Length > 0) break; }
-            await Task.Delay(50, cts.Token);
+
+            if (gotData)
+            {
+                idle = 0;
+                var text = leftover.ToString();
+                int idx;
+                while ((idx = text.IndexOf('\n')) >= 0)
+                {
+                    var line = text[..idx];
+                    text = text[(idx + 1)..];
+
+                    var cleaned = AnsiRegex().Replace(line, "").Replace("\r", "").Trim();
+                    if (cleaned.Length == 0) continue;
+
+                    Emit(cleaned);
+                }
+                leftover.Clear();
+                leftover.Append(text);
+            }
+            else
+            {
+                idle++;
+                if (idle >= maxIdle) break;
+            }
+
+            await Task.Delay(50, ct);
         }
-        return sb.ToString();
-    }
 
-    // ---- output cleaning ----
-
-    /// <summary>
-    /// Strips ANSI, normalizes newlines, and deduplicates the trailing
-    /// double-prompt that shells emit with bracketed-paste mode.
-    /// Keeps the LAST prompt occurrence (no trailing newline) so the next
-    /// command's echo naturally lands on the same line.
-    /// </summary>
-    private string Clean(string raw)
-    {
-        if (string.IsNullOrEmpty(raw)) return "(no output)";
-
-        var text = AnsiRegex().Replace(raw, "");
-        text = text.Replace("\r\n", "\n").Replace('\r', '\n');
-
-        // First pass: collapse consecutive duplicate prompt lines, keep last copy
-        var deduped = new List<string>();
-        foreach (var line in text.Split('\n'))
+        // Flush leftover
+        if (leftover.Length > 0)
         {
-            if (line.Trim().Length == 0)
-                continue; // skip blank lines
-
-            // Replace consecutive duplicates (prompt\nprompt → keep last)
-            if (deduped.Count > 0 && deduped[^1] == line)
-                deduped.RemoveAt(deduped.Count - 1);
-
-            deduped.Add(line);
+            var cleaned = AnsiRegex().Replace(leftover.ToString(), "").Replace("\r", "").Trim();
+            if (cleaned.Length > 0) Emit(cleaned);
         }
 
-        // Second pass: remove any non-blank line that appears more than once
-        var seen = new HashSet<string>();
-        var result = new List<string>();
-        foreach (var line in deduped)
-        {
-            if (seen.Add(line))
-                result.Add(line);
-        }
-
-        if (result.Count == 0) return "(no output)";
-        var output = string.Join("\n", result);
-        DebugLog("CLEAN", output);
-        return output;
+        DebugLog("CLEAN", finalLine ?? "(empty)");
+        return finalLine ?? "";
     }
 
     [GeneratedRegex(
