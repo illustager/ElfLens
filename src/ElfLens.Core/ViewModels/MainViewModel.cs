@@ -28,6 +28,8 @@ public partial class MainViewModel : ViewModelBase
     public ObservableCollection<PanelViewModel> RightPanels { get; } = new();
     public ObservableCollection<PanelViewModel> BottomPanels { get; } = new();
 
+    private ShellPanelViewModel? _gdbShellPanel;
+
     public MainViewModel()
     {
         _sshService = new SshService();
@@ -40,6 +42,23 @@ public partial class MainViewModel : ViewModelBase
         BottomPanels.Add(ShellPanel);
         RightPanels.Add(FileInfoPanel);
         CenterPanels.Add(DisassemblyPanel);
+
+        DisassemblyPanel.GdbSessionChanged += (session, title) =>
+        {
+            if (session != null)
+            {
+                _gdbShellPanel = new ShellPanelViewModel(session, title);
+                BottomPanels.Add(_gdbShellPanel);
+            }
+            else
+            {
+                if (_gdbShellPanel != null)
+                {
+                    BottomPanels.Remove(_gdbShellPanel);
+                    _gdbShellPanel = null;
+                }
+            }
+        };
     }
 
     private async void OnConnectionSucceeded(SshConnectionInfo info)

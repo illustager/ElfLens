@@ -12,9 +12,10 @@ namespace ElfLens.Core.ViewModels;
 
 public partial class ShellPanelViewModel : PanelViewModel
 {
-    public override string Title => "Shell";
+    private string _title = "Shell";
+    public override string Title => _title;
     public override PanelZone Zone => PanelZone.Bottom;
-    private readonly ISshService _sshService;
+    private readonly ISshService? _sshService;
     private ShellSession? _session;
     private readonly List<string> _commandHistory = new();
     private int _historyIndex = -1;
@@ -24,15 +25,22 @@ public partial class ShellPanelViewModel : PanelViewModel
     [ObservableProperty] private string _prompt = "$ ";
     [ObservableProperty] private string _outputText = string.Empty;
 
-    public ShellPanelViewModel(ISshService sshService)
+    /// <summary>Normal shell — creates session from SSH service.</summary>
+    public ShellPanelViewModel(ISshService sshService) { _sshService = sshService; }
+
+    /// <summary>GDB shell — uses existing session, no init needed.</summary>
+    public ShellPanelViewModel(ShellSession session, string title)
     {
-        _sshService = sshService;
+        _session = session;
+        _title = title;
+        var uiCtx = SynchronizationContext.Current;
+        _session.OnOutput += chunk => uiCtx?.Post(_ => AppendOutput(chunk), null);
     }
 
     [RelayCommand]
     private async Task InitializeAsync()
     {
-        if (_session != null) return;
+        if (_session != null || _sshService == null) return;
         var uiCtx = SynchronizationContext.Current;
         try
         {

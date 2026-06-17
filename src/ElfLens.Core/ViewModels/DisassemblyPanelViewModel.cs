@@ -44,6 +44,7 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
 
     public ObservableCollection<FunctionItem> Functions { get; } = new();
     public event Action<FunctionItem>? NavigateToFunction;
+    public event Action<ShellSession?, string>? GdbSessionChanged;
 
     public DisassemblyPanelViewModel(ISshService sshService) => _sshService = sshService;
 
@@ -85,6 +86,7 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
             await Task.Delay(800); // wait for GDB banner
 
             IsDebugging = true;
+            GdbSessionChanged?.Invoke(_gdbSession, "GDB");
             await RefreshDynamicAsync();
         }
         catch (Exception ex)
@@ -110,6 +112,7 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
         await Task.Delay(200);
         _gdbSession.Dispose();
         _gdbSession = null;
+        GdbSessionChanged?.Invoke(null, "");
         IsDebugging = false;
         await RefreshAsync();
     }
