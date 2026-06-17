@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/ElfLens.Core/ElfLens.Core.csproj" />
+    <Project Path="src/ElfLens/ElfLens.csproj" />
+  </Folder>
+</Solution>
