@@ -133,6 +133,15 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
             var pcM = Regex.Match(all, @"0x([0-9a-f]+)");
             var pcAddr = pcM.Success ? pcM.Groups[1].Value : "";
 
+            // Program exited — no valid PC
+            if (pcAddr.Length == 0)
+            {
+                CurrentFunction = "(exited)";
+                CurrentPc = "";
+                foreach (var fb in FunctionBlocks) fb.IsExpanded = false;
+                return;
+            }
+
             var nameM = Regex.Match(all, @"<([a-zA-Z_]\w*)(?:\+\d+)?>");
             var funcName = nameM.Success ? nameM.Groups[1].Value
                 : (pcAddr.Length > 0 ? "0x" + pcAddr : "??");
