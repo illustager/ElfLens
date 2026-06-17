@@ -1,0 +1,112 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ElfLens.Core.ViewModels"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="480" d:DesignHeight="520"
+             x:Class="ElfLens.Views.ConnectPageView"
+             x:DataType="vm:ConnectPageViewModel">
+
+    <Design.DataContext>
+        <vm:ConnectPageViewModel/>
+    </Design.DataContext>
+
+    <Border Padding="40" MaxWidth="460">
+        <StackPanel Spacing="16">
+
+            <!-- Header -->
+            <TextBlock Text="ElfLens"
+                       FontSize="28" FontWeight="Bold"
+                       HorizontalAlignment="Center" />
+            <TextBlock Text="Linux Binary Analysis Tool"
+                       FontSize="14" Opacity="0.7"
+                       HorizontalAlignment="Center" Margin="0,0,0,8" />
+
+            <!-- SSH Connection Section -->
+            <Border Padding="16" CornerRadius="6"
+                    Background="{DynamicResource SystemAltMediumLowBrush}"
+                    BorderThickness="0">
+                <StackPanel Spacing="12">
+                    <TextBlock Text="SSH Connection" FontSize="16" FontWeight="SemiBold" />
+
+                    <!-- Host -->
+                    <StackPanel Spacing="4">
+                        <TextBlock Text="Host Address" FontSize="12" />
+                        <TextBox Text="{Binding Host}" PlaceholderText="192.168.1.100 or hostname" />
+                    </StackPanel>
+
+                    <!-- Port + Username row -->
+                    <Grid ColumnDefinitions="120,*" RowDefinitions="Auto">
+                        <StackPanel Grid.Column="0" Spacing="4" Margin="0,0,8,0">
+                            <TextBlock Text="Port" FontSize="12" />
+                            <NumericUpDown Value="{Binding Port}" Minimum="1" Maximum="65535" />
+                        </StackPanel>
+                        <StackPanel Grid.Column="1" Spacing="4">
+                            <TextBlock Text="Username" FontSize="12" />
+                            <TextBox Text="{Binding Username}" PlaceholderText="root" />
+                        </StackPanel>
+                    </Grid>
+
+                    <!-- Auth Method Toggle -->
+                    <StackPanel Spacing="8">
+                        <TextBlock Text="Authentication" FontSize="12" />
+                        <StackPanel Orientation="Horizontal" Spacing="16">
+                            <RadioButton IsChecked="{Binding UsePasswordAuth}" GroupName="AuthMode">
+                                Password
+                            </RadioButton>
+                            <RadioButton IsChecked="{Binding UsePasswordAuth, Converter={x:Static BoolConverters.Not}}"
+                                         GroupName="AuthMode">
+                                Key File
+                            </RadioButton>
+                        </StackPanel>
+                    </StackPanel>
+
+                    <!-- Password field -->
+                    <StackPanel Spacing="4" IsVisible="{Binding UsePasswordAuth}">
+                        <TextBlock Text="Password" FontSize="12" />
+                        <TextBox Text="{Binding Password}" PasswordChar="•" PlaceholderText="Enter password" />
+                    </StackPanel>
+
+                    <!-- Key file field -->
+                    <StackPanel Spacing="4" IsVisible="{Binding UsePasswordAuth, Converter={x:Static BoolConverters.Not}}">
+                        <TextBlock Text="Private Key File" FontSize="12" />
+                        <Grid ColumnDefinitions="*,Auto">
+                            <TextBox Grid.Column="0" Text="{Binding KeyFilePath}"
+                                     PlaceholderText="~/.ssh/id_rsa" />
+                            <Button Grid.Column="1" Content="Browse…" Margin="8,0,0,0" Padding="12,4" />
+                        </Grid>
+                    </StackPanel>
+                </StackPanel>
+            </Border>
+
+            <!-- Target Binary Section -->
+            <Border Padding="16" CornerRadius="6"
+                    Background="{DynamicResource SystemAltMediumLowBrush}"
+                    BorderThickness="0">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="Target Binary" FontSize="16" FontWeight="SemiBold" />
+                    <TextBlock Text="Path to the binary on the remote Linux host"
+                               FontSize="12" Opacity="0.7"
+                               Margin="0,0,0,4" />
+                    <TextBox Text="{Binding TargetBinaryPath}"
+                             PlaceholderText="/usr/bin/target_app" />
+                </StackPanel>
+            </Border>
+
+            <!-- Error message -->
+            <TextBlock Text="{Binding ErrorMessage}"
+                       Foreground="Red"
+                       FontSize="13" HorizontalAlignment="Center"
+                       IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
+
+            <!-- Connect Button -->
+            <Button Content="Connect"
+                    Command="{Binding ConnectCommand}"
+                    HorizontalAlignment="Stretch"
+                    HorizontalContentAlignment="Center"
+                    Padding="12,10" FontSize="15" FontWeight="SemiBold"
+                    Classes="accent" />
+
+        </StackPanel>
+    </Border>
+</UserControl>

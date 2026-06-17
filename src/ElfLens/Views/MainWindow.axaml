@@ -3,18 +3,17 @@
         xmlns:vm="using:ElfLens.Core.ViewModels"
         xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
         xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-        mc:Ignorable="d" d:DesignWidth="800" d:DesignHeight="450"
+        mc:Ignorable="d" d:DesignWidth="520" d:DesignHeight="560"
         x:Class="ElfLens.Views.MainWindow"
-        x:DataType="vm:MainViewModel"
-        Title="{Binding Title}">
+        x:DataType="vm:ConnectPageViewModel"
+        Title="ElfLens">
 
     <Design.DataContext>
-        <vm:MainViewModel/>
+        <vm:ConnectPageViewModel/>
     </Design.DataContext>
 
-    <TextBlock Text="{Binding Title}"
-               HorizontalAlignment="Center"
-               VerticalAlignment="Center"
-               FontSize="24" />
+    <ScrollViewer>
+        <ContentControl Content="{Binding}" />
+    </ScrollViewer>
 
 </Window>
