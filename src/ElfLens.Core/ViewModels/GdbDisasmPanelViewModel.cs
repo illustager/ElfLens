@@ -26,7 +26,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
     [ObservableProperty] private bool _isDebugging;
     [ObservableProperty] private string _currentFunction = "";
 
-    public ObservableCollection<HighlightedLine> Lines { get; } = new();
+    public ObservableCollection<FunctionItem> FunctionBlocks { get; } = new();
     public event Action<ShellSession?, string>? SessionChanged;
 
     public GdbDisasmPanelViewModel(ISshService sshService, DisassemblyPanelViewModel staticDisasm)
@@ -76,7 +76,8 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         _session = null;
         SessionChanged?.Invoke(null, "");
         IsDebugging = false;
-        Lines.Clear();
+        FunctionBlocks.Clear();
+        _lastFunc = "";
         _staticDisasm.HighlightFunction(null, null);
     }
 
@@ -89,7 +90,6 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
     }
 
     private string _lastFunc = "";
-    private string _cachedAsm = "";
 
     private async Task RefreshAsync()
     {
@@ -107,21 +107,21 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
             CurrentFunction = funcName;
 
             // Only disassemble when entering a new function
-            string asm;
-            if (funcName != _lastFunc || string.IsNullOrEmpty(_cachedAsm))
+            if (funcName != _lastFunc || string.IsNullOrEmpty(funcName))
             {
-                asm = string.IsNullOrEmpty(pcAddr)
+                _lastFunc = funcName;
+                var asm = string.IsNullOrEmpty(pcAddr)
                     ? await Capture("disassemble /r")
                     : await Capture($"disassemble /r 0x{pcAddr}");
-                _cachedAsm = asm;
-                _lastFunc = funcName;
-                Lines.Clear();
-                ParseGdb(asm, pcAddr);
+                var block = ParseGdbBlock(asm, funcName, pcAddr);
+                if (block != null) FunctionBlocks.Add(block);
             }
             else
             {
-                // Just update highlight
-                UpdateHighlight(pcAddr);
+                // Same function — clear all then re-highlight current
+                ClearAllHighlights();
+                var last = FunctionBlocks.LastOrDefault();
+                if (last != null) HighlightInBlock(last, pcAddr);
             }
 
             if (_staticDisasm.HasFunction(funcName))
@@ -133,16 +133,27 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         finally { IsBusy = false; }
     }
 
-    private void UpdateHighlight(string pcAddr)
+    private void ClearAllHighlights()
     {
-        for (int i = 0; i < Lines.Count; i++)
+        foreach (var fb in FunctionBlocks)
         {
-            var line = Lines[i];
-            // Create new HighlightedLine with updated IsCurrent
-            var tokens = line.Tokens;
-            var isCur = tokens.Any(t =>
+            for (int i = 0; i < fb.Instructions.Count; i++)
+            {
+                if (fb.Instructions[i].IsCurrent)
+                    fb.Instructions[i] = new HighlightedLine(fb.Instructions[i].Tokens, false);
+            }
+        }
+    }
+
+    private void HighlightInBlock(FunctionItem block, string pcAddr)
+    {
+        for (int i = 0; i < block.Instructions.Count; i++)
+        {
+            var line = block.Instructions[i];
+            var isCur = line.Tokens.Any(t =>
                 t.Text.Contains(pcAddr, StringComparison.OrdinalIgnoreCase));
-            Lines[i] = new HighlightedLine(tokens, isCur);
+            if (isCur)
+                block.Instructions[i] = new HighlightedLine(line.Tokens, true);
         }
     }
 
@@ -165,41 +176,42 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         return string.Join("", sb);
     }
 
-    private void ParseGdb(string output, string? currentPc)
+    private FunctionItem? ParseGdbBlock(string output, string funcName, string? currentPc)
     {
+        var insts = new List<HighlightedLine>();
         bool inDump = false;
+        string? firstAddr = null;
+
         foreach (var line in output.Split('\n'))
         {
             var trimmed = line.Trim();
             if (trimmed.Length == 0) continue;
-
-            // Skip echoed commands and prompts
             if (!inDump && !trimmed.Contains("Dump of assembler")) continue;
             if (trimmed == "End of assembler dump.") { inDump = false; continue; }
             if (trimmed.StartsWith("pwndbg") || trimmed.EndsWith("pwndbg>")) continue;
             if (trimmed == "disassemble" || trimmed.StartsWith("disassemble /r")) continue;
             if (trimmed.StartsWith("info ")) continue;
 
-            var gdbFm = Regex.Match(line, @"^Dump of assembler code for function\s+(.+):$");
-            if (gdbFm.Success)
+            if (Regex.IsMatch(line, @"^Dump of assembler code for function\s+(.+):$"))
             {
                 inDump = true;
-                Lines.Add(new HighlightedLine(
-                    new List<Token> { new($"▼ {gdbFm.Groups[1].Value}", "#4FC3F7") }));
                 continue;
             }
-
             if (!inDump) continue;
 
             var gdbInst = Regex.Match(line, @"^\s*(?:=>\s*)?(0x[0-9a-f]+)\s+<\+(\d+)>:\s+(.*)$");
             if (gdbInst.Success)
             {
                 var addr = gdbInst.Groups[1].Value[2..];
+                firstAddr ??= addr;
                 var body = gdbInst.Groups[3].Value;
                 var normalized = $"  {addr}:\t{body}";
                 var isCur = currentPc != null && string.Equals(addr, currentPc, StringComparison.OrdinalIgnoreCase);
-                Lines.Add(new HighlightedLine(DisassemblyHighlighter.Tokenize(normalized), isCur));
+                insts.Add(new HighlightedLine(DisassemblyHighlighter.Tokenize(normalized), isCur));
             }
         }
+
+        if (insts.Count == 0) return null;
+        return new FunctionItem(funcName, firstAddr ?? "", insts);
     }
 }
