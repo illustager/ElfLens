@@ -24,7 +24,7 @@
                             <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="22">
                                 <Button Grid.Column="0" Padding="2,0" Background="Transparent"
                                         BorderThickness="0" FontSize="13" Width="22"
-                                        Click="OnToggleClick" Tag="{Binding .}">
+                                        Click="OnToggleClick">
                                     <Panel>
                                         <TextBlock Text="☐" Foreground="#EF5350"
                                                    IsVisible="{Binding Enabled, Converter={x:Static BoolConverters.Not}}" />
@@ -42,7 +42,7 @@
                                 <Button Grid.Column="2" Content="✕" Padding="4,0" FontSize="11"
                                         Background="Transparent" BorderThickness="0"
                                         Foreground="#EF5350"
-                                        Click="OnRemoveClick" Tag="{Binding .}" />
+                                        Click="OnRemoveClick" />
                             </Grid>
                         </Border>
                     </DataTemplate>
