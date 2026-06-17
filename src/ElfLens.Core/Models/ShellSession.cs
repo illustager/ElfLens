@@ -8,7 +8,7 @@ using Renci.SshNet;
 
 namespace ElfLens.Core.Models;
 
-#pragma warning disable CA2022 // ShellStream partial reads are expected
+#pragma warning disable CA2022
 
 public partial class ShellSession : IDisposable
 {
@@ -21,11 +21,7 @@ public partial class ShellSession : IDisposable
     {
         _shellStream = shellStream ?? throw new ArgumentNullException(nameof(shellStream));
         _writer = new StreamWriter(_shellStream) { AutoFlush = true };
-
-        Thread.Sleep(800);
-        Drain();
-        _writer.WriteLine("stty -echo 2>/dev/null; export PS1='$ '");
-        Thread.Sleep(300);
+        Thread.Sleep(500);
         Drain();
     }
 
@@ -102,48 +98,17 @@ public partial class ShellSession : IDisposable
     }
 
     /// <summary>
-    /// Strips ANSI sequences and removes the trailing prompt line.
-    /// With stty -echo, there's no echoed command — just output + final prompt.
+    /// Strips ANSI escape sequences only. Leaves everything else intact —
+    /// the shell's own prompt, echoed command, and output read like a real terminal.
     /// </summary>
     private static string CleanOutput(string rawOutput)
     {
         if (string.IsNullOrEmpty(rawOutput))
             return "(no output)";
 
-        // 1. Strip ANSI escape sequences
         var text = AnsiRegex().Replace(rawOutput, "");
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
-
-        // 2. Remove trailing prompt line(s). The last line should be just "$ " or "# ".
-        var lines = text.Split('\n');
-        var end = lines.Length;
-
-        // Strip trailing empty lines
-        while (end > 0 && lines[end - 1].Trim().Length == 0)
-            end--;
-
-        // Strip trailing prompt line: exactly "$ " or "# "
-        if (end > 0)
-        {
-            var last = lines[end - 1].Trim();
-            if (last is "$" or "#" || last is "$ " or "# ")
-                end--;
-        }
-
-        // 3. Rebuild, skipping leading empty lines
-        var sb = new StringBuilder();
-        var started = false;
-        for (int i = 0; i < end; i++)
-        {
-            var trimmed = lines[i].Trim();
-            if (!started && trimmed.Length == 0)
-                continue;
-            started = true;
-            sb.AppendLine(lines[i]);
-        }
-
-        var result = sb.ToString().Trim();
-        return result.Length > 0 ? result : "(no output)";
+        return text.Trim();
     }
 
     [GeneratedRegex(

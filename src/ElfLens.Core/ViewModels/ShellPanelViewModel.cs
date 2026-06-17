@@ -77,8 +77,6 @@ public partial class ShellPanelViewModel : ViewModelBase
         _commandHistory.Add(command);
         _historyIndex = _commandHistory.Count;
 
-        // Draw the command line: "$ ls"
-        OutputLines.Add(new ShellOutputLine($"{Prompt}{command}", ShellOutputType.Command));
         InputCommand = string.Empty;
 
         if (_session == null)
