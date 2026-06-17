@@ -12,6 +12,22 @@ namespace ElfLens.Core.ViewModels;
 public enum LineType { Function, Instruction, Branch, Call, Ret, Other }
 public record HighlightedLine(LineType Type, string Text);
 
+public partial class FunctionItem : ObservableObject
+{
+    public string Name { get; }
+    public string Address { get; }
+    public IList<HighlightedLine> Instructions { get; set; }
+    [ObservableProperty] private bool _isExpanded;
+
+    public FunctionItem(string name, string addr, IList<HighlightedLine> insts)
+    {
+        Name = name; Address = addr; Instructions = insts;
+    }
+
+    [RelayCommand]
+    private void Toggle() => IsExpanded = !IsExpanded;
+}
+
 public partial class DisassemblyPanelViewModel : PanelViewModel
 {
     private readonly ISshService _sshService;
@@ -23,34 +39,51 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _functionCount = "";
 
-    public ObservableCollection<HighlightedLine> Lines { get; } = new();
+    public ObservableCollection<FunctionItem> Functions { get; } = new();
 
-    public DisassemblyPanelViewModel(ISshService sshService)
-    {
-        _sshService = sshService;
-    }
+    public DisassemblyPanelViewModel(ISshService sshService) => _sshService = sshService;
 
     [RelayCommand]
     private async Task RefreshAsync()
     {
         if (string.IsNullOrWhiteSpace(TargetPath)) return;
         IsBusy = true;
-        Lines.Clear();
+        Functions.Clear();
         try
         {
             var output = await _sshService.ExecuteCommandAsync($"objdump -d \"{TargetPath}\"");
-            int funcs = 0;
-            foreach (var line in output.Split('\n'))
-            {
-                if (line.Trim().Length == 0) continue;
-                var type = Classify(line);
-                if (type == LineType.Function) funcs++;
-                Lines.Add(new HighlightedLine(type, line));
-            }
-            FunctionCount = $"{funcs} functions";
+            Parse(output);
         }
-        catch (Exception ex) { Lines.Add(new HighlightedLine(LineType.Other, $"Error: {ex.Message}")); }
+        catch (Exception ex)
+        {
+            Functions.Add(new FunctionItem("Error", "", new List<HighlightedLine>
+                { new(LineType.Other, ex.Message) }));
+        }
         finally { IsBusy = false; }
+    }
+
+    private void Parse(string output)
+    {
+        FunctionItem? cur = null;
+        var insts = new List<HighlightedLine>();
+        foreach (var line in output.Split('\n'))
+        {
+            var trimmed = line.Trim();
+            if (trimmed.Length == 0) continue;
+
+            var fm = Regex.Match(line, @"^([0-9a-f]+)\s+<([^>]+)>:$");
+            if (fm.Success)
+            {
+                if (cur != null) { cur.Instructions = insts; Functions.Add(cur); }
+                cur = new FunctionItem(fm.Groups[2].Value, fm.Groups[1].Value, new List<HighlightedLine>());
+                insts = new List<HighlightedLine>();
+                continue;
+            }
+            if (cur != null)
+                insts.Add(new HighlightedLine(Classify(line), line));
+        }
+        if (cur != null) { cur.Instructions = insts; Functions.Add(cur); }
+        FunctionCount = $"{Functions.Count} functions";
     }
 
     private static LineType Classify(string line)

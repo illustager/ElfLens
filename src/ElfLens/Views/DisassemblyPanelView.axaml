@@ -5,7 +5,7 @@
              x:Class="ElfLens.Views.DisassemblyPanelView"
              x:DataType="vm:DisassemblyPanelViewModel">
 
-    <Grid RowDefinitions="Auto,*" Margin="4">
+    <Grid RowDefinitions="Auto,Auto,*" Margin="4">
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
             <Button Content="Refresh" Command="{Binding RefreshCommand}"
                     Padding="8,2" FontSize="11"
@@ -14,17 +14,57 @@
                        VerticalAlignment="Center" Opacity="0.7" />
         </StackPanel>
 
-        <ScrollViewer Grid.Row="1"
+        <TextBlock Grid.Row="1" Text="Click a function to expand/collapse"
+                   FontSize="10" Opacity="0.4" Margin="0,4,0,6" />
+
+        <ScrollViewer Grid.Row="2"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
-            <ItemsControl ItemsSource="{Binding Lines}" x:CompileBindings="False">
+            <ItemsControl ItemsSource="{Binding Functions}" x:CompileBindings="False">
                 <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:HighlightedLine">
-                        <TextBlock Text="{Binding Text}"
-                                   FontSize="12"
-                                   FontFamily="Cascadia Code, Consolas, Menlo, monospace"
-                                   Margin="0,0,0,0"
-                                   Foreground="{Binding Type, Converter={x:Static cnv:HighlightConverters.LineTypeBrush}}" />
+                    <DataTemplate x:DataType="vm:FunctionItem">
+                        <Border Margin="0,0,0,2"
+                                Background="{DynamicResource SystemAltMediumLowBrush}"
+                                CornerRadius="3">
+                            <StackPanel>
+                                <!-- Header -->
+                                <Button Padding="6,3" Background="Transparent"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left"
+                                        Command="{Binding ToggleCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="▸" FontSize="10" Width="12"
+                                                   IsVisible="{Binding IsExpanded, Converter={x:Static BoolConverters.Not}}" />
+                                        <TextBlock Text="▾" FontSize="10" Width="12"
+                                                   IsVisible="{Binding IsExpanded}" />
+                                        <TextBlock FontSize="11" FontFamily="Cascadia Code, Consolas, monospace">
+                                            <TextBlock.Text>
+                                                <MultiBinding StringFormat="{}{0}: {1} ({2} instructions)">
+                                                    <Binding Path="Address" />
+                                                    <Binding Path="Name" />
+                                                    <Binding Path="Instructions.Count" />
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Button>
+
+                                <!-- Instructions -->
+                                <ItemsControl ItemsSource="{Binding Instructions}"
+                                              IsVisible="{Binding IsExpanded}"
+                                              Margin="16,0,4,4" x:CompileBindings="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:HighlightedLine">
+                                            <TextBlock Text="{Binding Text}"
+                                                       FontSize="12"
+                                                       FontFamily="Cascadia Code, Consolas, Menlo, monospace"
+                                                       Margin="0,0,0,0"
+                                                       Foreground="{Binding Type, Converter={x:Static cnv:HighlightConverters.LineTypeBrush}}" />
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
                     </DataTemplate>
                 </ItemsControl.ItemTemplate>
             </ItemsControl>
