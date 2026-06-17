@@ -134,12 +134,31 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
 
     private void ParseGdb(string output, string? currentPc)
     {
+        bool inDump = false;
         foreach (var line in output.Split('\n'))
         {
             var trimmed = line.Trim();
-            if (trimmed.Length == 0 || trimmed == "End of assembler dump.") continue;
+            if (trimmed.Length == 0) continue;
 
-            var gdbInst = Regex.Match(line, @"^\s+(0x[0-9a-f]+)\s+<\+(\d+)>:\s+(.*)$");
+            // Skip echoed commands and prompts
+            if (!inDump && !trimmed.Contains("Dump of assembler")) continue;
+            if (trimmed == "End of assembler dump.") { inDump = false; continue; }
+            if (trimmed.StartsWith("pwndbg") || trimmed.EndsWith("pwndbg>")) continue;
+            if (trimmed == "disassemble" || trimmed.StartsWith("disassemble /r")) continue;
+            if (trimmed.StartsWith("info ")) continue;
+
+            var gdbFm = Regex.Match(line, @"^Dump of assembler code for function\s+(.+):$");
+            if (gdbFm.Success)
+            {
+                inDump = true;
+                Lines.Add(new HighlightedLine(
+                    new List<Token> { new($"▼ {gdbFm.Groups[1].Value}", "#4FC3F7") }));
+                continue;
+            }
+
+            if (!inDump) continue;
+
+            var gdbInst = Regex.Match(line, @"^\s*(?:=>\s*)?(0x[0-9a-f]+)\s+<\+(\d+)>:\s+(.*)$");
             if (gdbInst.Success)
             {
                 var addr = gdbInst.Groups[1].Value[2..];
@@ -147,28 +166,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 var normalized = $"  {addr}:\t{body}";
                 var isCur = currentPc != null && string.Equals(addr, currentPc, StringComparison.OrdinalIgnoreCase);
                 Lines.Add(new HighlightedLine(DisassemblyHighlighter.Tokenize(normalized), isCur));
-                continue;
             }
-
-            var gdbFm = Regex.Match(line, @"^Dump of assembler code for function\s+(.+):$");
-            if (gdbFm.Success)
-            {
-                Lines.Add(new HighlightedLine(
-                    new List<Token> { new($"▼ {gdbFm.Groups[1].Value}", "#4FC3F7") }));
-                continue;
-            }
-
-            if (trimmed.StartsWith("=>"))
-            {
-                var rest = trimmed[2..].Trim();
-                var addrM = Regex.Match(rest, @"^(0x[0-9a-f]+)");
-                var addr = addrM.Success ? addrM.Groups[1].Value[2..] : "";
-                var isCur = currentPc != null && string.Equals(addr, currentPc, StringComparison.OrdinalIgnoreCase);
-                Lines.Add(new HighlightedLine(DisassemblyHighlighter.Tokenize($"  {addr}:\t{rest}"), isCur));
-                continue;
-            }
-
-            Lines.Add(new HighlightedLine(DisassemblyHighlighter.Tokenize(line)));
         }
     }
 }
