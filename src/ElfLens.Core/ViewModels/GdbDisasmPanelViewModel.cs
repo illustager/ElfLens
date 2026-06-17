@@ -190,7 +190,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         // Format: "f3 0f 1e fa    endbr64 " or "f3 0f 1e fa    endbr64     # comment"
         var tokens = new List<Token> { new($"  {addr}:\t", "#546E7A") };
 
-        var m = Regex.Match(body, @"^((?:[0-9a-f]{2}\s)+)(\s+)([a-z]\w*)((?:\s+.*?)?)(\s*#.*)?$", RegexOptions.IgnoreCase);
+        var m = Regex.Match(body, @"^((?:[0-9a-f]{2}\s)*[0-9a-f]{2})(\s+)([a-z]\w*)((?:\s+.*?)?)(\s*#.*)?$", RegexOptions.IgnoreCase);
         if (m.Success)
         {
             tokens.Add(new Token(m.Groups[1].Value, "#546E7A"));  // bytes
