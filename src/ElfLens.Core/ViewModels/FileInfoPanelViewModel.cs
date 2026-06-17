@@ -74,12 +74,17 @@ public partial class FileInfoPanelViewModel : PanelViewModel
         foreach (var line in output.Split('\n'))
         {
             // -W: [Nr] Name Type Address Off Size ES Flg Lk Inf Al
-            var m = Regex.Match(line, @"^\s*\[\s*(\d+)\]\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)$");
-            if (m.Success && m.Groups[1].Value != "0") // skip NULL section
+            // Flg may be empty; use (\S*) and check for numeric
+            var m = Regex.Match(line,
+                @"^\s*\[\s*(\d+)\]\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S*)\s+(\S+)\s+(\S+)\s+(\S+)$");
+            if (m.Success && m.Groups[1].Value != "0")
             {
+                var flags = m.Groups[8].Value;
+                if (flags.Length == 0 || char.IsDigit(flags[0]))
+                    flags = "-"; // no flags or numeric (misparse)
                 Sections.Add(new SectionItem(
                     m.Groups[2].Value, m.Groups[3].Value, m.Groups[4].Value,
-                    m.Groups[5].Value, m.Groups[6].Value, m.Groups[7].Value));
+                    m.Groups[5].Value, m.Groups[6].Value, flags));
             }
         }
         ComputeSectionColumnWidths();
