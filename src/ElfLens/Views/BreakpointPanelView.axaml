@@ -2,8 +2,7 @@
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ElfLens.Core.ViewModels"
              x:Class="ElfLens.Views.BreakpointPanelView"
-             x:DataType="vm:BreakpointPanelViewModel"
-             x:Name="root">
+             x:DataType="vm:BreakpointPanelViewModel">
 
     <Grid RowDefinitions="Auto,Auto,*" Margin="4">
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4" Margin="0,0,0,6">
@@ -22,12 +21,10 @@
                         <Border Margin="0,0,0,2" Padding="4,2"
                                 Background="{DynamicResource SystemAltMediumLowBrush}"
                                 CornerRadius="2">
-                            <Grid ColumnDefinitions="Auto,*,Auto,Auto" MinHeight="22">
+                            <Grid ColumnDefinitions="Auto,*,Auto" MinHeight="22">
                                 <Button Grid.Column="0" Padding="2,0" Background="Transparent"
                                         BorderThickness="0" FontSize="13" Width="22"
-                                        Command="{Binding DataContext.ToggleCommand,
-                                            ElementName=root}}"
-                                        CommandParameter="{Binding .}">
+                                        Click="OnToggleClick" Tag="{Binding .}">
                                     <Panel>
                                         <TextBlock Text="☐" Foreground="#EF5350"
                                                    IsVisible="{Binding Enabled, Converter={x:Static BoolConverters.Not}}" />
@@ -42,12 +39,10 @@
                                     <TextBlock Text="{Binding ResolvedAddr}" FontSize="10"
                                                Opacity="0.5" FontFamily="Cascadia Code, Consolas, monospace" />
                                 </StackPanel>
-                                <Button Grid.Column="3" Content="✕" Padding="4,0" FontSize="11"
+                                <Button Grid.Column="2" Content="✕" Padding="4,0" FontSize="11"
                                         Background="Transparent" BorderThickness="0"
                                         Foreground="#EF5350"
-                                        Command="{Binding DataContext.RemoveCommand,
-                                            ElementName=root}}"
-                                        CommandParameter="{Binding .}" />
+                                        Click="OnRemoveClick" Tag="{Binding .}" />
                             </Grid>
                         </Border>
                     </DataTemplate>
