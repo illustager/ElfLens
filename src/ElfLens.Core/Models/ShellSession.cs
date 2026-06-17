@@ -24,8 +24,8 @@ public partial class ShellSession : IDisposable
 
         Thread.Sleep(800);
         Drain();
-        _writer.WriteLine("stty -echo 2>/dev/null");
-        Thread.Sleep(200);
+        _writer.WriteLine("stty -echo 2>/dev/null; export PS1='$ '");
+        Thread.Sleep(300);
         Drain();
     }
 
@@ -113,39 +113,38 @@ public partial class ShellSession : IDisposable
         var text = AnsiRegex().Replace(rawOutput, "");
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
 
-        // Find and remove the trailing prompt line
         var lines = text.Split('\n');
         var end = lines.Length;
 
-        // Strip trailing blank lines
-        while (end > 0 && lines[end - 1].Trim().Length == 0)
-            end--;
+        // Strip trailing blank lines and prompt lines
+        while (end > 0)
+        {
+            var trimmed = lines[end - 1].Trim();
+            if (trimmed.Length == 0 || IsTrailingPrompt(lines[end - 1]))
+                end--;
+            else
+                break;
+        }
 
-        // Strip trailing prompt: "$ ", "# ", "user@host:~$ ", etc.
-        if (end > 0 && IsTrailingPrompt(lines[end - 1]))
-            end--;
-
-        // Also check second-to-last (bracketed paste wrapping gives two prompts)
-        while (end > 0 && lines[end - 1].Trim().Length == 0)
-            end--;
-
-        // Rebuild
+        // Rebuild, collapsing consecutive blank lines
         var sb = new StringBuilder();
+        var prevBlank = false;
         for (int i = 0; i < end; i++)
         {
-            var trimmed = lines[i].Trim();
-            // Skip leading blank lines
-            if (sb.Length == 0 && trimmed.Length == 0) continue;
+            var line = lines[i];
+            var isBlank = line.Trim().Length == 0;
 
-            // Collapse consecutive blank lines
-            if (trimmed.Length == 0 && sb.Length > 0)
+            if (isBlank)
             {
-                if (!sb.ToString().EndsWith("\n\n"))
+                if (!prevBlank && sb.Length > 0)
                     sb.AppendLine();
-                continue;
+                prevBlank = true;
             }
-
-            sb.AppendLine(lines[i]);
+            else
+            {
+                sb.AppendLine(line);
+                prevBlank = false;
+            }
         }
 
         var result = sb.ToString().Trim();
