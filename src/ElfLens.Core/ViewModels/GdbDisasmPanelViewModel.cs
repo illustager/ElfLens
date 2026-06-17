@@ -77,6 +77,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         SessionChanged?.Invoke(null, "");
         IsDebugging = false;
         FunctionBlocks.Clear();
+        CurrentFunction = "";
         _staticDisasm.HighlightFunction(null, null);
     }
 
