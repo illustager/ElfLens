@@ -13,7 +13,8 @@ public partial class BreakpointPanelView : UserControl
 
     private void OnToggleClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is Button btn && btn.Tag is BreakpointEntry entry &&
+        System.Diagnostics.Debug.WriteLine("[BP] Toggle clicked");
+        if (sender is Button btn && btn.DataContext is BreakpointEntry entry &&
             DataContext is BreakpointPanelViewModel vm)
         {
             vm.ToggleCommand.Execute(entry);
@@ -22,7 +23,8 @@ public partial class BreakpointPanelView : UserControl
 
     private void OnRemoveClick(object? sender, RoutedEventArgs e)
     {
-        if (sender is Button btn && btn.Tag is BreakpointEntry entry &&
+        System.Diagnostics.Debug.WriteLine("[BP] Remove clicked");
+        if (sender is Button btn && btn.DataContext is BreakpointEntry entry &&
             DataContext is BreakpointPanelViewModel vm)
         {
             vm.RemoveCommand.Execute(entry);
