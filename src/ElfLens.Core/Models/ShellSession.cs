@@ -14,14 +14,24 @@ public partial class ShellSession : IDisposable
     private readonly StreamWriter _writer;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
-    private const string EndMarker = "__ELFENS_END__";
+    // Avoid $, _, and other shell-special chars in the marker
+    private const string EndMarker = "EEELFENSEND999";
     private const int ReadTimeoutMs = 30_000;
+
+    // Temporary log for debugging raw shell output
+    private static readonly string LogPath =
+        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "elflens_shell_debug.log");
 
     internal ShellSession(ShellStream shellStream)
     {
         _shellStream = shellStream ?? throw new ArgumentNullException(nameof(shellStream));
         _writer = new StreamWriter(_shellStream) { AutoFlush = true };
         DrainInitialOutput();
+
+        // Turn off complex prompts — use a simple dollar sign
+        _writer.WriteLine("export PS1='$ '");
+        Thread.Sleep(200);
+        DrainRemaining();
     }
 
     private void DrainInitialOutput()
@@ -37,7 +47,23 @@ public partial class ShellSession : IDisposable
                     Thread.Sleep(100);
             }
         }
-        catch { /* best-effort */ }
+        catch { }
+    }
+
+    private void DrainRemaining()
+    {
+        try
+        {
+            var buffer = new byte[4096];
+            for (int i = 0; i < 10; i++)
+            {
+                if (_shellStream.DataAvailable)
+                    _shellStream.Read(buffer, 0, buffer.Length);
+                else
+                    Thread.Sleep(100);
+            }
+        }
+        catch { }
     }
 
     public async Task<string> ExecuteCommandAsync(string command, CancellationToken ct = default)
@@ -45,12 +71,15 @@ public partial class ShellSession : IDisposable
         await _writeLock.WaitAsync(ct);
         try
         {
-            // Append an end marker so we know when output is done
-            var fullCommand = $"{command}; echo {EndMarker}$?";
+            // Append end marker — pure alphanumeric, no shell-special chars
+            var fullCommand = $"{command} ; echo {EndMarker}";
             await _writer.WriteLineAsync(fullCommand.AsMemory(), ct);
 
-            // Read everything until the end marker appears
             var rawOutput = await ReadUntilEndMarkerAsync(ct);
+
+            // Write raw output to debug log
+            File.AppendAllText(LogPath,
+                $"\n=== CMD: {command} ===\n{rawOutput}\n=== END ===\n");
 
             return CleanOutput(rawOutput);
         }
@@ -98,45 +127,41 @@ public partial class ShellSession : IDisposable
         if (string.IsNullOrEmpty(rawOutput))
             return "(no output)";
 
-        // 1. Strip all ANSI / OSC escape sequences
+        // 1. Strip ANSI sequences
         var text = AnsiRegex().Replace(rawOutput, "");
 
         // 2. Normalize line endings
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
 
-        // 3. Locate the end marker and take everything before it
+        // 3. Find the end marker and cut before it
         var markerIdx = text.IndexOf(EndMarker, StringComparison.Ordinal);
         if (markerIdx < 0)
-            return "(no output)";
+        {
+            // Marker not found — return whatever we got (stripped)
+            var trimmed = text.Trim();
+            return trimmed.Length > 0 ? trimmed : "(no output)";
+        }
 
         text = text[..markerIdx];
 
-        // 4. Remove the echoed command line (first line that looks like our full command)
+        // 4. Remove the echoed command line and prompt artifacts
         var lines = text.Split('\n');
         var sb = new StringBuilder();
-        var firstRealLine = false;
+        var foundContent = false;
 
         foreach (var line in lines)
         {
             var trimmed = line.Trim();
 
-            // Skip empty lines before real output
-            if (!firstRealLine && trimmed.Length == 0)
+            // Skip the echoed command (contains our marker reference in the full command)
+            if (!foundContent && trimmed.Contains("echo") && trimmed.Contains(EndMarker))
                 continue;
 
-            // Skip the echoed command line — it contains EndMarker text and $?
-            // Since we already cut at the marker, this would be the full command echo
-            if (!firstRealLine && trimmed.Contains("echo") && trimmed.Contains("$?"))
-            {
-                firstRealLine = true;
-                continue;
-            }
-
-            // Skip lines that are just a prompt
+            // Skip typical prompt lines
             if (trimmed is "$" or "#" or "")
                 continue;
 
-            // Handle embedded prompt: "some output user@host:~$ "
+            // Handle line with embedded prompt at end: "some output $ "
             if (trimmed.EndsWith("$ ") || trimmed.EndsWith("# "))
             {
                 var promptIdx = trimmed.LastIndexOfAny(['$', '#']);
@@ -145,13 +170,14 @@ public partial class ShellSession : IDisposable
                     var content = trimmed[..promptIdx].Trim();
                     if (content.Length > 0)
                     {
+                        foundContent = true;
                         sb.AppendLine(content);
                     }
                 }
                 continue;
             }
 
-            firstRealLine = true;
+            foundContent = true;
             sb.AppendLine(line);
         }
 
@@ -159,15 +185,14 @@ public partial class ShellSession : IDisposable
         return result.Length > 0 ? result : "(no output)";
     }
 
-    // Matches CSI, OSC, and other ANSI escape codes
     [GeneratedRegex(
-        @"\x1b\[[0-9;?]*[a-zA-Z]|" +       // CSI: \e[...m, \e[...J, etc.
-        @"\x1b\][^\x07]*\x07|" +            // OSC ending with BEL
-        @"\x1b\][^\x1b]*\x1b\\|" +          // OSC ending with ST
-        @"\x1b[PX^_].*?\x1b\\|" +           // DCS/SOS/PM/APC
-        @"\x1b[\x20-\x2f][^\x1b]*\x1b\\|" + // Escape sequences with intermediates
-        @"\x1b[()][0-2AB]|" +               // Character set selection
-        @"\x1b\[\?[0-9]+[hl]")]             // DEC private modes
+        @"\x1b\[[0-9;?]*[a-zA-Z]|" +
+        @"\x1b\][^\x07]*\x07|" +
+        @"\x1b\][^\x1b]*\x1b\\|" +
+        @"\x1b[PX^_].*?\x1b\\|" +
+        @"\x1b[\x20-\x2f][^\x1b]*\x1b\\|" +
+        @"\x1b[()][0-2AB]|" +
+        @"\x1b\[\?[0-9]+[hl]")]
     private static partial Regex AnsiRegex();
 
     public void Dispose()
