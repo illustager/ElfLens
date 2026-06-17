@@ -50,7 +50,8 @@ public partial class ShellSession : IDisposable
         await _writeLock.WaitAsync(ct);
         try
         {
-            await _writer.WriteLineAsync(command.AsMemory(), ct);
+            var line = command.EndsWith('\n') ? command : command + "\n";
+            await _writer.WriteAsync(line.AsMemory(), ct);
             await ReadChunksAsync(onChunk, ct);
         }
         finally { _writeLock.Release(); }
