@@ -54,7 +54,7 @@ public class SshService : ISshService, IDisposable
                     height: 600,
                     bufferSize: 65536));
 
-            return new ShellSession(shellStream, () => _client?.IsConnected ?? false);
+            return new ShellSession(shellStream);
         }
         catch (Exception ex)
         {
