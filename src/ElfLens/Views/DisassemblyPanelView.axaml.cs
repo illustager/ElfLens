@@ -1,6 +1,9 @@
 using System;
+using System.Linq;
+using Avalonia;
 using Avalonia.Controls;
 using Avalonia.Threading;
+using Avalonia.VisualTree;
 
 namespace ElfLens.Views;
 
@@ -18,19 +21,14 @@ public partial class DisassemblyPanelView : UserControl
         {
             vm.NavigateToFunction += fn =>
             {
+                // Expand first, then scroll after layout updates
                 Dispatcher.UIThread.Post(() =>
                 {
-                    // Find the Border for this function and scroll to it
-                    for (int i = 0; i < vm.Functions.Count; i++)
-                    {
-                        if (vm.Functions[i] == fn)
-                        {
-                            var container = Scroller; // not exact — ItemsControl
-                            // Use BringIntoView on a known element
-                            break;
-                        }
-                    }
-                });
+                    var border = Scroller.GetVisualDescendants()
+                        .OfType<Border>()
+                        .FirstOrDefault(b => b.DataContext == fn);
+                    border?.BringIntoView();
+                }, DispatcherPriority.Background);
             };
         }
     }
