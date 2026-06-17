@@ -87,6 +87,13 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
 
             IsDebugging = true;
             GdbSessionChanged?.Invoke(_gdbSession, "GDB");
+
+            // Auto-start: break at _start and run
+            await Task.Delay(300);
+            await _gdbSession.SendCommandAsync("break _start");
+            await Task.Delay(200);
+            await _gdbSession.SendCommandAsync("run");
+            await Task.Delay(500);
             await RefreshDynamicAsync();
         }
         catch (Exception ex)
