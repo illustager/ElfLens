@@ -41,7 +41,7 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
         }
         catch (Exception ex)
         {
-            Functions.Add(new FunctionItem($"Error: {ex.Message}", "", new List<string>()));
+            Functions.Add(new FunctionItem($"Error: {ex.Message}", "", new List<HighlightedLine>()));
         }
         finally
         {
@@ -56,7 +56,7 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
     private void ParseDisassembly(string output)
     {
         FunctionItem? current = null;
-        var instructions = new List<string>();
+        var instructions = new List<HighlightedLine>();
 
         foreach (var line in output.Split('\n'))
         {
@@ -68,14 +68,17 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
                     current.Instructions = instructions;
                     Functions.Add(current);
                 }
-                current = new FunctionItem(m.Groups[2].Value, m.Groups[1].Value, new List<string>());
-                instructions = new List<string>();
+                current = new FunctionItem(m.Groups[2].Value, m.Groups[1].Value, new List<HighlightedLine>());
+                instructions = new List<HighlightedLine>();
                 continue;
             }
 
             var trimmed = line.Trim();
             if (trimmed.Length > 0 && current != null)
-                instructions.Add(trimmed);
+            {
+                var type = ClassifyLine(trimmed);
+                instructions.Add(new HighlightedLine(type, line)); // keep original formatting
+            }
         }
 
         if (current != null)
@@ -84,20 +87,36 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
             Functions.Add(current);
         }
     }
+
+    private static LineType ClassifyLine(string line)
+    {
+        var m = Regex.Match(line, @"^\s*(?:[0-9a-f]+:\s+)?(?:[0-9a-f]{2}\s+)*([a-z]+)\b",
+            RegexOptions.IgnoreCase);
+        if (!m.Success) return LineType.Other;
+        var mnem = m.Groups[1].Value.ToLower();
+        if (mnem is "call") return LineType.Call;
+        if (mnem is "ret" or "retn" or "retf" or "iret" or "iretq") return LineType.Ret;
+        if (mnem.StartsWith('j') || mnem is "loop" or "loope" or "loopne") return LineType.Branch;
+        return LineType.Instruction;
+    }
 }
+
+public enum LineType { Function, Instruction, Branch, Call, Ret, Other }
+
+public record HighlightedLine(LineType Type, string Text);
 
 public partial class FunctionItem : ObservableObject
 {
     public string Name { get; }
     public string Address { get; }
-    public IList<string> Instructions { get; set; }
+    public IList<HighlightedLine> Instructions { get; set; }
 
     [ObservableProperty] private bool _isExpanded;
 
     public string Summary =>
         $"{Address}: {Name}  ({Instructions?.Count ?? 0} instructions)";
 
-    public FunctionItem(string name, string address, IList<string> instructions)
+    public FunctionItem(string name, string address, IList<HighlightedLine> instructions)
     {
         Name = name;
         Address = address;

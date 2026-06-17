@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ElfLens.Core.ViewModels"
+             xmlns:cnv="using:ElfLens.Converters"
              x:Class="ElfLens.Views.DisassemblyPanelView"
              x:DataType="vm:DisassemblyPanelViewModel">
 
@@ -44,13 +45,14 @@
                                 <!-- Instructions -->
                                 <ItemsControl ItemsSource="{Binding Instructions}"
                                               IsVisible="{Binding IsExpanded}"
-                                              Margin="20,0,4,4">
+                                              Margin="20,0,4,4" x:CompileBindings="False">
                                     <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="x:String">
-                                            <TextBlock Text="{Binding}"
+                                        <DataTemplate x:DataType="vm:HighlightedLine">
+                                            <TextBlock Text="{Binding Text}"
                                                        FontSize="11"
                                                        FontFamily="Cascadia Code, Consolas, monospace"
-                                                       Opacity="0.8" Margin="0,0,0,1" />
+                                                       Margin="0,0,0,1"
+                                                       Foreground="{Binding Type, Converter={x:Static cnv:LineTypeConverters.ToBrush}}" />
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
