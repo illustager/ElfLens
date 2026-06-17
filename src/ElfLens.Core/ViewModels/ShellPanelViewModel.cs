@@ -37,11 +37,8 @@ public partial class ShellPanelViewModel : ViewModelBase
             _session = await _sshService.CreateShellSessionAsync();
             if (_session != null)
             {
-                AppendOutput(_session.Prompt + " ");
                 _session.OnOutput += chunk =>
-                {
                     uiCtx?.Post(_ => AppendOutput(chunk), null);
-                };
             }
             else AppendOutput("!!! Failed to create shell session\n");
         }
@@ -52,17 +49,12 @@ public partial class ShellPanelViewModel : ViewModelBase
     private async Task SendCommand()
     {
         var command = InputCommand;
-
         _commandHistory.Add(command);
         _historyIndex = _commandHistory.Count;
         InputCommand = string.Empty;
 
         if (_session == null) { AppendOutput("!!! Shell not initialized\n"); return; }
-
-        try
-        {
-            await _session.SendCommandAsync(command);
-        }
+        try { await _session.SendCommandAsync(command); }
         catch (Exception ex) { AppendOutput($"!!! Error: {ex.Message}\n"); }
     }
 

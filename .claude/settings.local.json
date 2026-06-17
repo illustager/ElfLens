@@ -1,7 +1,10 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git checkout *)"
+      "Bash(git checkout *)",
+      "Bash(dotnet build *)",
+      "Bash(git add *)",
+      "Bash(git commit *)"
     ]
   }
 }
