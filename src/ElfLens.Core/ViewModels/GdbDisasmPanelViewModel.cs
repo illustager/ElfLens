@@ -27,6 +27,31 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
     [ObservableProperty] private string _currentFunction = "";
     [ObservableProperty] private string _currentPc = "";
 
+    partial void OnCurrentPcChanged(string value)
+    {
+        UpdateHighlight(value);
+    }
+
+    private void UpdateHighlight(string pc)
+    {
+        for (int bi = 0; bi < FunctionBlocks.Count; bi++)
+        {
+            var fb = FunctionBlocks[bi];
+            var changed = false;
+            var newInsts = new List<HighlightedLine>();
+            foreach (var line in fb.Instructions)
+            {
+                var first = line.Tokens.FirstOrDefault();
+                var isCur = first?.Text.Trim()
+                    .Contains(pc, StringComparison.OrdinalIgnoreCase) == true;
+                if (isCur != line.IsCurrent) changed = true;
+                newInsts.Add(new HighlightedLine(line.Tokens, isCur));
+            }
+            if (changed)
+                FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
+        }
+    }
+
     public ObservableCollection<FunctionItem> FunctionBlocks { get; } = new();
     public event Action<ShellSession?, string>? SessionChanged;
 
