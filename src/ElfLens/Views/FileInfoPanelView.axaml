@@ -4,25 +4,78 @@
              x:Class="ElfLens.Views.FileInfoPanelView"
              x:DataType="vm:FileInfoPanelViewModel">
 
-    <Grid RowDefinitions="Auto,*,Auto" Margin="4">
-        <!-- Header -->
-        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4">
-            <Button Content="Refresh" Command="{Binding RefreshCommand}"
-                    Padding="8,2" FontSize="11"
-                    IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
-        </StackPanel>
+    <ScrollViewer>
+        <StackPanel Spacing="8" Margin="6">
 
-        <!-- Output -->
-        <TextBox Grid.Row="1"
-                 Text="{Binding OutputText}"
-                 IsReadOnly="True"
-                 FontFamily="Cascadia Code, Consolas, Menlo, monospace"
-                 FontSize="12"
-                 Foreground="#E0E0E0"
-                 Background="Transparent"
-                 BorderThickness="0"
-                 TextWrapping="Wrap"
-                 AcceptsReturn="True"
-                 CaretBrush="Transparent" />
-    </Grid>
+            <Button Content="Refresh" Command="{Binding RefreshCommand}"
+                    Padding="8,2" FontSize="11" HorizontalAlignment="Left"
+                    IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
+
+            <!-- File Type -->
+            <Border Padding="6" CornerRadius="4"
+                    Background="{DynamicResource SystemAltMediumLowBrush}">
+                <StackPanel Spacing="2">
+                    <TextBlock Text="FILE TYPE" FontSize="10"
+                               Foreground="{DynamicResource SystemBaseMediumColorBrush}" />
+                    <TextBlock Text="{Binding FileType}" FontSize="12" TextWrapping="Wrap" />
+                </StackPanel>
+            </Border>
+
+            <!-- ELF Header -->
+            <Border Padding="6" CornerRadius="4"
+                    Background="{DynamicResource SystemAltMediumLowBrush}">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="ELF HEADER" FontSize="10"
+                               Foreground="{DynamicResource SystemBaseMediumColorBrush}" />
+                    <ItemsControl ItemsSource="{Binding ElfHeaders}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:KeyValueItem">
+                                <Grid ColumnDefinitions="140,*" Margin="0,1">
+                                    <TextBlock Grid.Column="0" Text="{Binding Key}"
+                                               FontSize="11" Opacity="0.7" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Value}"
+                                               FontSize="11" FontWeight="SemiBold" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+            <!-- Section Table -->
+            <Border Padding="6" CornerRadius="4"
+                    Background="{DynamicResource SystemAltMediumLowBrush}">
+                <StackPanel Spacing="4">
+                    <TextBlock Text="SECTIONS" FontSize="10"
+                               Foreground="{DynamicResource SystemBaseMediumColorBrush}"
+                               Margin="0,0,0,4" />
+                    <!-- Header row -->
+                    <Grid ColumnDefinitions="*,60,80,60,50" Margin="0,0,0,2">
+                        <TextBlock Grid.Column="0" Text="Name" FontSize="10" FontWeight="Bold" />
+                        <TextBlock Grid.Column="1" Text="Type" FontSize="10" FontWeight="Bold" />
+                        <TextBlock Grid.Column="2" Text="Address" FontSize="10" FontWeight="Bold" />
+                        <TextBlock Grid.Column="3" Text="Size" FontSize="10" FontWeight="Bold" />
+                        <TextBlock Grid.Column="4" Text="Flags" FontSize="10" FontWeight="Bold" />
+                    </Grid>
+                    <ItemsControl ItemsSource="{Binding Sections}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SectionItem">
+                                <Grid ColumnDefinitions="*,60,80,60,50" Margin="0,1">
+                                    <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                               FontSize="11" FontFamily="Cascadia Code, Consolas, monospace" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Type}" FontSize="10" Opacity="0.8" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Address}"
+                                               FontSize="10" FontFamily="Cascadia Code, Consolas, monospace" Opacity="0.8" />
+                                    <TextBlock Grid.Column="3" Text="{Binding Size}" FontSize="10" Opacity="0.8" />
+                                    <TextBlock Grid.Column="4" Text="{Binding Flags}"
+                                               FontSize="10" FontFamily="Cascadia Code, Consolas, monospace" Opacity="0.8" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
+        </StackPanel>
+    </ScrollViewer>
 </UserControl>
