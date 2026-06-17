@@ -171,12 +171,10 @@ public partial class ShellSession : IDisposable
         while (lines.Count > 0 && lines[^1] == "")
             lines.RemoveAt(lines.Count - 1);
 
-        var sb = new StringBuilder();
-        foreach (var line in lines)
-            sb.AppendLine(line);
-
-        var result = sb.ToString().TrimEnd('\n');
-        return result.Length > 0 ? result : "(no output)";
+        if (lines.Count == 0) return "(no output)";
+        var result = string.Join("\n", lines);
+        DebugLog("CLEAN", result);
+        return result;
     }
 
     [GeneratedRegex(
