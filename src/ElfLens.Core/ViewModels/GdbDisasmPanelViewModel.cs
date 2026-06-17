@@ -97,14 +97,13 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         IsBusy = true;
         try
         {
-            // Single capture for all commands to avoid cross-talk
-            var all = await Capture("info registers pc ; info symbol $pc");
+            // Single capture for info commands to avoid cross-talk
+            var all = await Capture("info registers pc");
             var pcM = Regex.Match(all, @"0x([0-9a-f]+)");
             var pcAddr = pcM.Success ? pcM.Groups[1].Value : "";
 
-            var fnM = Regex.Match(all, @"(?:symbol|in)\s+\$pc\b[^:]*:\s*(.+)");
-            var fnRaw = fnM.Success ? fnM.Groups[1].Value.Trim() : "";
-            var nameM = Regex.Match(fnRaw, @"\b([a-zA-Z_]\w+)\b");
+            // Extract function name from <name+offset> in pc output
+            var nameM = Regex.Match(all, @"<([a-zA-Z_]\w*)(?:\+\d+)?>");
             var funcName = nameM.Success ? nameM.Groups[1].Value : "";
             CurrentFunction = funcName;
 
