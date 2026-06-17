@@ -1,0 +1,76 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ElfLens.Core.ViewModels"
+             xmlns:cnv="using:ElfLens.Converters"
+             xmlns:core="using:ElfLens.Core"
+             x:Class="ElfLens.Views.GdbDisasmPanelView"
+             x:DataType="vm:GdbDisasmPanelViewModel">
+
+    <Grid RowDefinitions="Auto,*" Margin="4">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4">
+            <Button Content="Start Debugging" Command="{Binding StartDebuggingCommand}"
+                    Padding="6,2" FontSize="11" Classes="start"
+                    IsVisible="{Binding IsDebugging, Converter={x:Static BoolConverters.Not}}" />
+            <Button Content="Step Into" Command="{Binding StepIntoCommand}"
+                    Padding="6,2" FontSize="11" Classes="debug"
+                    IsVisible="{Binding IsDebugging}" />
+            <Button Content="Step Over" Command="{Binding StepOverCommand}"
+                    Padding="6,2" FontSize="11" Classes="debug"
+                    IsVisible="{Binding IsDebugging}" />
+            <Button Content="Continue" Command="{Binding ContinueCommand}"
+                    Padding="6,2" FontSize="11" Classes="debug"
+                    IsVisible="{Binding IsDebugging}" />
+            <Button Content="Restart" Command="{Binding RestartCommand}"
+                    Padding="6,2" FontSize="11" Classes="debug"
+                    IsVisible="{Binding IsDebugging}" />
+            <Button Content="Stop" Command="{Binding StopCommand}"
+                    Padding="6,2" FontSize="11" Classes="stop"
+                    IsVisible="{Binding IsDebugging}" />
+            <TextBlock Text="{Binding CurrentFunction}" FontSize="12"
+                       VerticalAlignment="Center" Opacity="0.7" Margin="8,0,0,0" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding Lines}" x:CompileBindings="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:HighlightedLine">
+                        <ItemsControl ItemsSource="{Binding Tokens}" x:CompileBindings="False"
+                                      Background="{Binding IsCurrent, Converter={x:Static cnv:HighlightConverters.CurrentBg}}">
+                            <ItemsControl.ItemsPanel>
+                                <ItemsPanelTemplate>
+                                    <StackPanel Orientation="Horizontal" />
+                                </ItemsPanelTemplate>
+                            </ItemsControl.ItemsPanel>
+                            <ItemsControl.ItemTemplate>
+                                <DataTemplate x:DataType="core:Token">
+                                    <TextBlock Text="{Binding Text}"
+                                               FontSize="12"
+                                               FontFamily="Cascadia Code, Consolas, Menlo, monospace"
+                                               Foreground="{Binding Color, Converter={x:Static cnv:HighlightConverters.HexToBrush}}" />
+                                </DataTemplate>
+                            </ItemsControl.ItemTemplate>
+                        </ItemsControl>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+
+    <UserControl.Styles>
+        <Style Selector="Button.start">
+            <Setter Property="Background" Value="#1A3A1A" />
+            <Setter Property="Foreground" Value="#4CAF50" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+        <Style Selector="Button.debug">
+            <Setter Property="Background" Value="#2A3A2A" />
+            <Setter Property="Foreground" Value="#81C784" />
+        </Style>
+        <Style Selector="Button.stop">
+            <Setter Property="Background" Value="#3A2A2A" />
+            <Setter Property="Foreground" Value="#EF5350" />
+        </Style>
+    </UserControl.Styles>
+</UserControl>

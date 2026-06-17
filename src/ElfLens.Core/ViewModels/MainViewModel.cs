@@ -22,6 +22,7 @@ public partial class MainViewModel : ViewModelBase
     public ShellPanelViewModel ShellPanel { get; }
     public FileInfoPanelViewModel FileInfoPanel { get; }
     public DisassemblyPanelViewModel DisassemblyPanel { get; }
+    public GdbDisasmPanelViewModel GdbDisasmPanel { get; }
 
     public ObservableCollection<PanelViewModel> LeftPanels { get; } = new();
     public ObservableCollection<PanelViewModel> CenterPanels { get; } = new();
@@ -37,13 +38,15 @@ public partial class MainViewModel : ViewModelBase
         ShellPanel = new ShellPanelViewModel(_sshService);
         FileInfoPanel = new FileInfoPanelViewModel(_sshService);
         DisassemblyPanel = new DisassemblyPanelViewModel(_sshService);
+        GdbDisasmPanel = new GdbDisasmPanelViewModel(_sshService, DisassemblyPanel);
         Workspace = new WorkspaceViewModel();
 
         BottomPanels.Add(ShellPanel);
         RightPanels.Add(FileInfoPanel);
         CenterPanels.Add(DisassemblyPanel);
+        CenterPanels.Add(GdbDisasmPanel);
 
-        DisassemblyPanel.GdbSessionChanged += (session, title) =>
+        GdbDisasmPanel.SessionChanged += (session, title) =>
         {
             if (session != null)
             {
@@ -75,6 +78,7 @@ public partial class MainViewModel : ViewModelBase
 
         FileInfoPanel.TargetPath = info.TargetBinaryPath;
         DisassemblyPanel.TargetPath = info.TargetBinaryPath;
+        GdbDisasmPanel.TargetPath = info.TargetBinaryPath;
         await Task.WhenAll(
             FileInfoPanel.RefreshCommand.ExecuteAsync(null),
             DisassemblyPanel.RefreshCommand.ExecuteAsync(null));

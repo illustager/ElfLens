@@ -10,6 +10,7 @@ public static class HighlightConverters
 {
     public static readonly IValueConverter HexToBrush = new HexToBrushConverter();
     public static readonly IValueConverter CurrentBg = new CurrentBgConverter();
+    public static readonly IValueConverter FuncHighlightBg = new FuncHighlightBgConverter();
     public static readonly IValueConverter NavCursor = new NavCursorConverter();
 
     private class HexToBrushConverter : IValueConverter
@@ -27,9 +28,22 @@ public static class HighlightConverters
     {
         public object? Convert(object? value, Type t, object? p, CultureInfo c)
         {
-            if (value is bool isCurrent && isCurrent)
+            if (value is bool isCur && isCur)
                 return new SolidColorBrush(Color.Parse("#3A3A00"));
             return Brushes.Transparent;
+        }
+        public object? ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+    }
+
+    private class FuncHighlightBgConverter : IValueConverter
+    {
+        private static readonly SolidColorBrush HighlightBrush = new(Color.Parse("#1A2A3A"));
+        private static readonly SolidColorBrush NormalBrush = new(Color.Parse("#1E1E1E"));
+
+        public object? Convert(object? value, Type t, object? p, CultureInfo c)
+        {
+            if (value is bool isCur && isCur) return HighlightBrush;
+            return NormalBrush;
         }
         public object? ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
     }
