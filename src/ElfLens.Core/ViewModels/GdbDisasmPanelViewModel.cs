@@ -64,7 +64,14 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
     [RelayCommand] private async Task StepIntoAsync() => await Step("stepi");
     [RelayCommand] private async Task StepOverAsync() => await Step("nexti");
     [RelayCommand] private async Task ContinueAsync() => await Step("continue");
-    [RelayCommand] private async Task RestartAsync() => await Step("run");
+    [RelayCommand]
+    private async Task RestartAsync()
+    {
+        FunctionBlocks.Clear();
+        _lastFunc = "";
+        _staticDisasm.HighlightFunction(null, null);
+        await Step("run");
+    }
 
     [RelayCommand]
     private async Task StopAsync()
