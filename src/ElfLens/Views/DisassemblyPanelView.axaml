@@ -11,6 +11,11 @@
             <Setter Property="Background" Value="#2A3A2A" />
             <Setter Property="Foreground" Value="#81C784" />
         </Style>
+        <Style Selector="Button.start">
+            <Setter Property="Background" Value="#1A3A1A" />
+            <Setter Property="Foreground" Value="#4CAF50" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
         <Style Selector="Button.stop">
             <Setter Property="Background" Value="#3A2A2A" />
             <Setter Property="Foreground" Value="#EF5350" />
@@ -20,17 +25,17 @@
     <Grid RowDefinitions="Auto,Auto,Auto,*" Margin="4">
         <!-- Toolbar -->
         <Grid Grid.Row="0" ColumnDefinitions="*,Auto">
-            <!-- Static buttons -->
-            <StackPanel Grid.Column="0" Orientation="Horizontal" Spacing="4"
-                        IsVisible="{Binding IsDebugging, Converter={x:Static BoolConverters.Not}}">
-                <Button Content="Refresh" Command="{Binding RefreshCommand}"
-                        Padding="6,2" FontSize="11"
-                        IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
-                <Button Content="Start Debugging" Command="{Binding StartDebuggingCommand}"
-                        Padding="6,2" FontSize="11"
-                        IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
-            </StackPanel>
-            <!-- Debug buttons, right-aligned, distinct style -->
+            <!-- Static buttons: refresh left -->
+            <Button Grid.Column="0" Content="Refresh" Command="{Binding RefreshCommand}"
+                    Padding="6,2" FontSize="11" HorizontalAlignment="Left"
+                    IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}"
+                    IsVisible="{Binding IsDebugging, Converter={x:Static BoolConverters.Not}}" />
+            <!-- Start Debugging right -->
+            <Button Grid.Column="1" Content="Start Debugging" Command="{Binding StartDebuggingCommand}"
+                    Padding="6,2" FontSize="11" Classes="start"
+                    IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}"
+                    IsVisible="{Binding IsDebugging, Converter={x:Static BoolConverters.Not}}" />
+            <!-- Debug buttons, right-aligned -->
             <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
                         IsVisible="{Binding IsDebugging}">
                 <Button Content="Step Into" Command="{Binding StepIntoCommand}"
