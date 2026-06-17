@@ -53,7 +53,6 @@ public partial class ShellPanelViewModel : ViewModelBase
     private async Task SendCommand()
     {
         var command = InputCommand;
-        if (command.Length == 0) return;
 
         _commandHistory.Add(command);
         _historyIndex = _commandHistory.Count;
