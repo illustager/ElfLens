@@ -6,14 +6,14 @@
              x:Name="root">
 
     <ScrollViewer>
-        <StackPanel Spacing="8" Margin="6">
+        <StackPanel Spacing="6" Margin="6">
 
             <Button Content="Refresh" Command="{Binding RefreshCommand}"
                     Padding="8,2" FontSize="11" HorizontalAlignment="Left"
                     IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
 
             <!-- File Type -->
-            <Border Padding="6" CornerRadius="4"
+            <Border Padding="6,4" CornerRadius="4"
                     Background="{DynamicResource SystemAltMediumLowBrush}">
                 <StackPanel Spacing="2">
                     <TextBlock Text="FILE TYPE" FontSize="10"
@@ -23,12 +23,16 @@
             </Border>
 
             <!-- ELF Header -->
-            <Border Padding="6" CornerRadius="4"
+            <Border Padding="6,4" CornerRadius="4"
                     Background="{DynamicResource SystemAltMediumLowBrush}">
-                <StackPanel Spacing="4">
-                    <TextBlock Text="ELF HEADER" FontSize="10"
-                               Foreground="{DynamicResource SystemBaseMediumColorBrush}" />
-                    <ItemsControl ItemsSource="{Binding ElfHeaders}">
+                <StackPanel Spacing="2">
+                    <ToggleButton x:Name="hdrToggle" Content="ELF HEADER" FontSize="10"
+                                  Foreground="{DynamicResource SystemBaseMediumColorBrush}"
+                                  Background="Transparent" BorderThickness="0"
+                                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                  Padding="0" Cursor="Hand" />
+                    <ItemsControl ItemsSource="{Binding ElfHeaders}"
+                                  IsVisible="{Binding #hdrToggle.IsChecked}">
                         <ItemsControl.ItemTemplate>
                             <DataTemplate x:DataType="vm:KeyValueItem">
                                 <Grid ColumnDefinitions="140,*" MinHeight="18">
@@ -45,45 +49,52 @@
             </Border>
 
             <!-- Section Table -->
-            <Border Padding="6" CornerRadius="4"
+            <Border Padding="6,4" CornerRadius="4"
                     Background="{DynamicResource SystemAltMediumLowBrush}">
-                <StackPanel Spacing="4">
-                    <TextBlock Text="SECTIONS" FontSize="10"
-                               Foreground="{DynamicResource SystemBaseMediumColorBrush}" />
-                    <!-- Header -->
-                    <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,2">
-                        <TextBlock Grid.Column="0" Text="Name" FontSize="10" FontWeight="Bold"
-                                   Width="{Binding ColNameWidth}" />
-                        <TextBlock Grid.Column="1" Text="Type" FontSize="10" FontWeight="Bold"
-                                   Width="{Binding ColTypeWidth}" />
-                        <TextBlock Grid.Column="2" Text="Address" FontSize="10" FontWeight="Bold"
-                                   Width="{Binding ColAddrWidth}" />
-                        <TextBlock Grid.Column="3" Text="Size" FontSize="10" FontWeight="Bold"
-                                   Width="{Binding ColSizeWidth}" />
-                        <TextBlock Grid.Column="4" Text="Flags" FontSize="10" FontWeight="Bold"
-                                   Width="{Binding ColFlagsWidth}" />
+                <StackPanel Spacing="2">
+                    <ToggleButton x:Name="secToggle" Content="SECTIONS" FontSize="10"
+                                  Foreground="{DynamicResource SystemBaseMediumColorBrush}"
+                                  Background="Transparent" BorderThickness="0"
+                                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                  Padding="0" Cursor="Hand" />
+                    <Grid IsVisible="{Binding #secToggle.IsChecked}">
+                        <StackPanel Spacing="4">
+                            <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto" Margin="0,0,0,2"
+                                  x:CompileBindings="False">
+                                <TextBlock Grid.Column="0" Text="Name" FontSize="10" FontWeight="Bold"
+                                           Width="{Binding ColNameWidth}" />
+                                <TextBlock Grid.Column="1" Text="Type" FontSize="10" FontWeight="Bold"
+                                           Width="{Binding ColTypeWidth}" />
+                                <TextBlock Grid.Column="2" Text="Address" FontSize="10" FontWeight="Bold"
+                                           Width="{Binding ColAddrWidth}" />
+                                <TextBlock Grid.Column="3" Text="Size" FontSize="10" FontWeight="Bold"
+                                           Width="{Binding ColSizeWidth}" />
+                                <TextBlock Grid.Column="4" Text="Flags" FontSize="10" FontWeight="Bold"
+                                           Width="{Binding ColFlagsWidth}" />
+                            </Grid>
+                            <ItemsControl ItemsSource="{Binding Sections}" x:CompileBindings="False">
+                                <ItemsControl.ItemTemplate>
+                                    <DataTemplate>
+                                        <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto" MinHeight="18">
+                                            <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11"
+                                                       FontFamily="Cascadia Code, Consolas, monospace"
+                                                       Width="{Binding DataContext.ColNameWidth, ElementName=root}" />
+                                            <TextBlock Grid.Column="1" Text="{Binding Type}" FontSize="10" Opacity="0.8"
+                                                       Width="{Binding DataContext.ColTypeWidth, ElementName=root}" />
+                                            <TextBlock Grid.Column="2" Text="{Binding Address}" FontSize="10"
+                                                       FontFamily="Cascadia Code, Consolas, monospace" Opacity="0.8"
+                                                       Width="{Binding DataContext.ColAddrWidth, ElementName=root}" />
+                                            <TextBlock Grid.Column="3" Text="{Binding Size}" FontSize="10" Opacity="0.8"
+                                                       Width="{Binding DataContext.ColSizeWidth, ElementName=root}" />
+                                            <TextBlock Grid.Column="4" Text="{Binding Flags}" FontSize="10"
+                                                       FontFamily="Cascadia Code, Consolas, monospace" Opacity="0.8"
+                                                       Width="{Binding DataContext.ColFlagsWidth, ElementName=root}" />
+                                        </Grid>
+                                    </DataTemplate>
+                                </ItemsControl.ItemTemplate>
+                            </ItemsControl>
+                        </StackPanel>
                     </Grid>
-                    <ItemsControl ItemsSource="{Binding Sections}" x:CompileBindings="False">
-                        <ItemsControl.ItemTemplate>
-                            <DataTemplate>
-                                <Grid ColumnDefinitions="Auto,Auto,Auto,Auto,Auto" MinHeight="18">
-                                    <TextBlock Grid.Column="0" Text="{Binding Name}" FontSize="11"
-                                               FontFamily="Cascadia Code, Consolas, monospace"
-                                               Width="{Binding DataContext.ColNameWidth, ElementName=root}" />
-                                    <TextBlock Grid.Column="1" Text="{Binding Type}" FontSize="10" Opacity="0.8"
-                                               Width="{Binding DataContext.ColTypeWidth, ElementName=root}" />
-                                    <TextBlock Grid.Column="2" Text="{Binding Address}" FontSize="10"
-                                               FontFamily="Cascadia Code, Consolas, monospace" Opacity="0.8"
-                                               Width="{Binding DataContext.ColAddrWidth, ElementName=root}" />
-                                    <TextBlock Grid.Column="3" Text="{Binding Size}" FontSize="10" Opacity="0.8"
-                                               Width="{Binding DataContext.ColSizeWidth, ElementName=root}" />
-                                    <TextBlock Grid.Column="4" Text="{Binding Flags}" FontSize="10"
-                                               FontFamily="Cascadia Code, Consolas, monospace" Opacity="0.8"
-                                               Width="{Binding DataContext.ColFlagsWidth, ElementName=root}" />
-                                </Grid>
-                            </DataTemplate>
-                        </ItemsControl.ItemTemplate>
-                    </ItemsControl>
                 </StackPanel>
             </Border>
 
