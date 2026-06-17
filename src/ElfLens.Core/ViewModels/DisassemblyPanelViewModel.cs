@@ -142,34 +142,40 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
         Functions.Clear();
         try
         {
-            // Get $pc
-            var pcOut = new List<string>();
-            var pcComplete = new TaskCompletionSource<bool>();
-
-            void OnPcOutput(string chunk)
-            {
-                pcOut.Add(chunk);
-                if (pcOut.Any(s => s.Contains("0x"))) pcComplete.TrySetResult(true);
-            }
-
-            _gdbSession.OnOutput += OnPcOutput;
-            await _gdbSession.SendCommandAsync("info registers pc");
-            await Task.WhenAny(pcComplete.Task, Task.Delay(2000));
-            _gdbSession.OnOutput -= OnPcOutput;
-
-            var pcLine = string.Join("", pcOut);
-            var pcMatch = Regex.Match(pcLine, @"0x([0-9a-f]+)");
-            var pc = pcMatch.Success ? pcMatch.Groups[1].Value : "";
+            // Get $pc from running GDB session
+            var pc = await CaptureGdbOutput("info registers pc");
+            var pcMatch = Regex.Match(pc, @"0x([0-9a-f]+)");
+            var pcAddr = pcMatch.Success ? pcMatch.Groups[1].Value : "";
 
             // Disassemble around $pc
-            var asmOut = string.IsNullOrEmpty(pc)
-                ? await _sshService.ExecuteCommandAsync($"gdb -q -batch -ex \"disassemble\" \"{TargetPath}\"")
-                : await _sshService.ExecuteCommandAsync($"gdb -q -batch -ex \"disassemble 0x{pc}\" \"{TargetPath}\"");
-
-            ParseStatic(asmOut, pc);
+            var asm = string.IsNullOrEmpty(pcAddr)
+                ? await CaptureGdbOutput("disassemble")
+                : await CaptureGdbOutput($"disassemble 0x{pcAddr}");
+            ParseStatic(asm, pcAddr);
         }
         catch { }
         finally { IsBusy = false; }
+    }
+
+    private async Task<string> CaptureGdbOutput(string command)
+    {
+        if (_gdbSession == null) return "";
+        var output = new List<string>();
+        var done = new TaskCompletionSource<bool>();
+
+        void Handler(string chunk)
+        {
+            output.Add(chunk);
+            // Stop collecting when we see a prompt or after enough data
+            if (output.Sum(s => s.Length) > 50000) done.TrySetResult(true);
+        }
+
+        _gdbSession.OnOutput += Handler;
+        await _gdbSession.SendCommandAsync(command);
+        await Task.WhenAny(done.Task, Task.Delay(1500));
+        _gdbSession.OnOutput -= Handler;
+
+        return string.Join("", output);
     }
 
     // ---- Parsing ----
