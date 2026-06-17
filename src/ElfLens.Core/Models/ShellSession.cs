@@ -139,12 +139,7 @@ public partial class ShellSession : IDisposable
             var isBlank = line.Trim().Length == 0;
 
             if (isBlank)
-            {
-                // collapse consecutive blanks
-                if (lines.Count > 0 && lines[^1] != "")
-                    lines.Add("");
-                continue;
-            }
+                continue;  // skip all blank lines
 
             // If the new line is identical to the last non-blank line,
             // REPLACE the old one — keep the last copy (no trailing \r\n in raw)
