@@ -29,7 +29,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
 
     private void UpdateHighlight(string pc)
     {
-        FunctionItem? found = null;
+        string? foundName = null;
         for (int bi = 0; bi < FunctionBlocks.Count; bi++)
         {
             var fb = FunctionBlocks[bi];
@@ -41,16 +41,20 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 var isCur = first?.Text.Trim()
                     .Contains(pc, StringComparison.OrdinalIgnoreCase) == true;
                 if (isCur != line.IsCurrent) changed = true;
-                if (isCur) found = fb;
+                if (isCur) foundName = fb.Name;
                 newInsts.Add(new HighlightedLine(line.Tokens, isCur));
             }
             if (changed)
                 FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
         }
-        if (found != null)
+        if (foundName != null)
         {
-            found.IsExpanded = true;
-            ScrollToBlock?.Invoke(found);
+            var block = FunctionBlocks.FirstOrDefault(f => f.Name == foundName);
+            if (block != null)
+            {
+                block.IsExpanded = true;
+                ScrollToBlock?.Invoke(block);
+            }
         }
     }
 
