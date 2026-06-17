@@ -155,8 +155,10 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
             var newInsts = new List<HighlightedLine>();
             foreach (var line in fb.Instructions)
             {
-                var isCur = line.Tokens.Any(t =>
-                    t.Text.Contains(pcAddr, StringComparison.OrdinalIgnoreCase));
+                // Only match the address column (first token starting with hex)
+                var firstToken = line.Tokens.FirstOrDefault();
+                var isCur = firstToken?.Text.Trim()
+                    .Contains(pcAddr, StringComparison.OrdinalIgnoreCase) == true;
                 newInsts.Add(new HighlightedLine(line.Tokens, isCur));
             }
             FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
@@ -216,7 +218,8 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 firstAddr ??= addr;
                 var body = gdbInst.Groups[3].Value;
                 var normalized = $"  {addr}:\t{body}";
-                var isCur = currentPc != null && string.Equals(addr, currentPc, StringComparison.OrdinalIgnoreCase);
+                var isCur = currentPc != null &&
+                    string.Equals(addr.TrimStart('0'), currentPc.TrimStart('0'), StringComparison.OrdinalIgnoreCase);
                 insts.Add(new HighlightedLine(DisassemblyHighlighter.Tokenize(normalized), isCur));
             }
         }
