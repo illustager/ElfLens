@@ -27,11 +27,6 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
     [ObservableProperty] private string _currentFunction = "";
     [ObservableProperty] private string _currentPc = "";
 
-    partial void OnCurrentPcChanged(string value)
-    {
-        UpdateHighlight(value);
-    }
-
     private void UpdateHighlight(string pc)
     {
         FunctionItem? found = null;
@@ -153,6 +148,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
             }
 
             CurrentPc = pcAddr;
+            UpdateHighlight(pcAddr);
 
             if (_staticDisasm.HasFunction(funcName))
                 _staticDisasm.HighlightFunction(funcName, pcAddr);

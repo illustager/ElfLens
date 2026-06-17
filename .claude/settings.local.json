@@ -10,7 +10,9 @@
       "Bash(dotnet add *)",
       "WebSearch",
       "Bash(dotnet run *)",
-      "Bash(dotnet remove *)"
+      "Bash(dotnet remove *)",
+      "Bash(git reset *)",
+      "Bash(dotnet clean *)"
     ]
   }
 }
