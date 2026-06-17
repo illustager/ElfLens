@@ -156,8 +156,8 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
 
             // Disassemble around $pc
             var asm = string.IsNullOrEmpty(pcAddr)
-                ? await CaptureGdbOutput("disassemble")
-                : await CaptureGdbOutput($"disassemble 0x{pcAddr}");
+                ? await CaptureGdbOutput("disassemble /r")
+                : await CaptureGdbOutput($"disassemble /r 0x{pcAddr}");
             ParseStatic(asm, pcAddr);
         }
         catch { }
@@ -195,7 +195,9 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
         {
             var trimmed = line.Trim();
             if (trimmed.Length == 0) continue;
+            if (trimmed == "End of assembler dump.") continue;
 
+            // objdump format: "0000000000001149 <main>:"
             var fm = Regex.Match(line, @"^([0-9a-f]+)\s+<([^>]+)>:$");
             if (fm.Success)
             {
@@ -204,6 +206,35 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
                 insts = new List<HighlightedLine>();
                 continue;
             }
+
+            // GDB format: "Dump of assembler code for function main:"
+            var gdbFm = Regex.Match(line, @"^Dump of assembler code for function\s+(.+):$");
+            if (gdbFm.Success)
+            {
+                if (cur != null) { cur.Instructions = insts; Functions.Add(cur); }
+                cur = new FunctionItem(gdbFm.Groups[1].Value, "", new List<HighlightedLine>());
+                insts = new List<HighlightedLine>();
+                continue;
+            }
+
+            // GDB instruction: "   0x0000000000001149 <+0>:     f3 0f 1e fa             endbr64"
+            // Flatten GDB format to look like objdump for the highlighter
+            var gdbInst = Regex.Match(line, @"^\s+(0x[0-9a-f]+)\s+<\+(\d+)>:\s+(.*)$");
+            if (gdbInst.Success)
+            {
+                var addr = gdbInst.Groups[1].Value[2..]; // strip "0x"
+                var bytesMnem = gdbInst.Groups[3].Value;
+                var normalized = $"  {addr}:\t{bytesMnem}";
+                if (cur != null)
+                {
+                    var isCurrent = currentPc != null &&
+                        string.Equals(addr, currentPc, StringComparison.OrdinalIgnoreCase);
+                    insts.Add(new HighlightedLine(DisassemblyHighlighter.Tokenize(normalized), isCurrent));
+                }
+                continue;
+            }
+
+            // Regular instruction line (objdump or already normalized)
             if (cur != null)
             {
                 var lineAddr = Regex.Match(line, @"^\s*([0-9a-f]+):");
