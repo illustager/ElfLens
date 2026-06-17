@@ -15,16 +15,16 @@
                        VerticalAlignment="Center" Opacity="0.7" />
         </StackPanel>
 
-        <TextBlock Grid.Row="1" Text="Click a function to expand/collapse"
+        <TextBlock Grid.Row="1" Text="Click a function to expand, click &lt;name&gt; to jump"
                    FontSize="10" Opacity="0.4" Margin="0,4,0,6" />
 
-        <ScrollViewer Grid.Row="2"
+        <ScrollViewer Grid.Row="2" x:Name="Scroller"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
             <ItemsControl ItemsSource="{Binding Functions}" x:CompileBindings="False">
                 <ItemsControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:FunctionItem">
-                        <Border Margin="0,0,0,2"
+                        <Border x:Name="fnBorder" Margin="0,0,0,2"
                                 Background="{DynamicResource SystemAltMediumLowBrush}"
                                 CornerRadius="3">
                             <StackPanel>
@@ -64,10 +64,22 @@
                                                 </ItemsControl.ItemsPanel>
                                                 <ItemsControl.ItemTemplate>
                                                     <DataTemplate x:DataType="core:Token">
-                                                        <TextBlock Text="{Binding Text}"
-                                                                   FontSize="12"
-                                                                   FontFamily="Cascadia Code, Consolas, Menlo, monospace"
-                                                                   Foreground="{Binding Color, Converter={x:Static cnv:HighlightConverters.HexToBrush}}" />
+                                                        <Button Padding="0" BorderThickness="0" Background="Transparent"
+                                                                Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                                                CommandParameter="{Binding NavigateTo}"
+                                                                IsEnabled="{Binding NavigateTo, Converter={x:Static ObjectConverters.IsNotNull}}"
+                                                                Cursor="Hand" HorizontalContentAlignment="Left"
+                                                                VerticalAlignment="Center">
+                                                            <Button.Styles>
+                                                                <Style Selector="Button:disabled /template/ ContentPresenter">
+                                                                    <Setter Property="Background" Value="Transparent" />
+                                                                </Style>
+                                                            </Button.Styles>
+                                                            <TextBlock Text="{Binding Text}"
+                                                                       FontSize="12"
+                                                                       FontFamily="Cascadia Code, Consolas, Menlo, monospace"
+                                                                       Foreground="{Binding Color, Converter={x:Static cnv:HighlightConverters.HexToBrush}}" />
+                                                        </Button>
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>

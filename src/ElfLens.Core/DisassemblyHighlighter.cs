@@ -3,7 +3,7 @@ using System.Text.RegularExpressions;
 
 namespace ElfLens.Core;
 
-public record Token(string Text, string Color);
+public record Token(string Text, string Color, string? NavigateTo = null);
 
 public static class DisassemblyHighlighter
 {
@@ -53,9 +53,9 @@ public static class DisassemblyHighlighter
         var fh = FuncRx.Match(line);
         if (fh.Success)
         {
-            t.Add(new Token(fh.Groups[1].Value, CAddr));
+            t.Add(new Token(fh.Groups[1].Value, CAddr, fh.Groups[1].Value)); // address clickable
             t.Add(new Token(" <", CDef));
-            t.Add(new Token(fh.Groups[2].Value, CFunc));
+            t.Add(new Token(fh.Groups[2].Value, CFunc, fh.Groups[2].Value)); // name clickable
             t.Add(new Token(">:", CDef));
             return t;
         }
@@ -97,7 +97,11 @@ public static class DisassemblyHighlighter
         while (p < text.Length)
         {
             var refM = RefRx.Match(text, p);
-            if (refM.Success && refM.Index == p) { tokens.Add(new Token(refM.Value, CFunc)); p += refM.Length; continue; }
+            if (refM.Success && refM.Index == p) {
+                var name = refM.Groups[1].Value;
+                tokens.Add(new Token(refM.Value, CFunc, name)); // clickable function ref
+                p += refM.Length; continue;
+            }
             var regM = RegRx.Match(text, p);
             if (regM.Success && regM.Index == p) { tokens.Add(new Token(regM.Value, CReg)); p += regM.Length; continue; }
             var hexM = HexRx.Match(text, p);

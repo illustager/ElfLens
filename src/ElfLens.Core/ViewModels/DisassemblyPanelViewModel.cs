@@ -39,8 +39,22 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
     [ObservableProperty] private string _functionCount = "";
 
     public ObservableCollection<FunctionItem> Functions { get; } = new();
+    public event Action<FunctionItem>? NavigateToFunction;
 
     public DisassemblyPanelViewModel(ISshService sshService) => _sshService = sshService;
+
+    [RelayCommand]
+    private void Navigate(string? target)
+    {
+        if (string.IsNullOrEmpty(target)) return;
+        var fn = Functions.FirstOrDefault(f =>
+            f.Name == target || f.Address == target);
+        if (fn != null)
+        {
+            fn.IsExpanded = true;
+            NavigateToFunction?.Invoke(fn);
+        }
+    }
 
     [RelayCommand]
     private async Task RefreshAsync()
