@@ -1,0 +1,23 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ElfLens.Core.ViewModels"
+             x:Class="ElfLens.Views.DisassemblyPanelView"
+             x:DataType="vm:DisassemblyPanelViewModel">
+
+    <Grid RowDefinitions="Auto,*" Margin="4">
+        <Button Grid.Row="0" Content="Refresh" Command="{Binding RefreshCommand}"
+                Padding="8,2" FontSize="11" HorizontalAlignment="Left"
+                IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
+
+        <TextBox Grid.Row="1"
+                 Text="{Binding OutputText}"
+                 IsReadOnly="True"
+                 FontFamily="Cascadia Code, Consolas, Menlo, monospace"
+                 FontSize="12"
+                 Foreground="#E0E0E0"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 AcceptsReturn="True"
+                 CaretBrush="Transparent" />
+    </Grid>
+</UserControl>

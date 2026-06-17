@@ -21,6 +21,7 @@ public partial class MainViewModel : ViewModelBase
     public WorkspaceViewModel Workspace { get; }
     public ShellPanelViewModel ShellPanel { get; }
     public FileInfoPanelViewModel FileInfoPanel { get; }
+    public DisassemblyPanelViewModel DisassemblyPanel { get; }
 
     public ObservableCollection<PanelViewModel> LeftPanels { get; } = new();
     public ObservableCollection<PanelViewModel> CenterPanels { get; } = new();
@@ -33,10 +34,12 @@ public partial class MainViewModel : ViewModelBase
         ConnectPage = new ConnectPageViewModel(_sshService, OnConnectionSucceeded);
         ShellPanel = new ShellPanelViewModel(_sshService);
         FileInfoPanel = new FileInfoPanelViewModel(_sshService);
+        DisassemblyPanel = new DisassemblyPanelViewModel(_sshService);
         Workspace = new WorkspaceViewModel();
 
         BottomPanels.Add(ShellPanel);
         RightPanels.Add(FileInfoPanel);
+        CenterPanels.Add(DisassemblyPanel);
     }
 
     private async void OnConnectionSucceeded(SshConnectionInfo info)
@@ -52,7 +55,10 @@ public partial class MainViewModel : ViewModelBase
         ConnectionStatus = $"Connected to {info.Host}";
 
         FileInfoPanel.TargetPath = info.TargetBinaryPath;
-        await FileInfoPanel.RefreshCommand.ExecuteAsync(null);
+        DisassemblyPanel.TargetPath = info.TargetBinaryPath;
+        await Task.WhenAll(
+            FileInfoPanel.RefreshCommand.ExecuteAsync(null),
+            DisassemblyPanel.RefreshCommand.ExecuteAsync(null));
     }
 
     public void AddPanel(PanelViewModel panel)
