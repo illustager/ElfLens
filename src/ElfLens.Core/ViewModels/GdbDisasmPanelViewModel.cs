@@ -115,11 +115,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                     : await Capture($"disassemble /r 0x{pcAddr}");
                 var block = ParseGdbBlock(asm, funcName, pcAddr);
                 if (block != null)
-                {
                     FunctionBlocks.Add(block);
-                    // Ensure highlight is set after adding
-                    HighlightCurrent(pcAddr, funcName);
-                }
             }
 
             HighlightCurrent(pcAddr, funcName);
