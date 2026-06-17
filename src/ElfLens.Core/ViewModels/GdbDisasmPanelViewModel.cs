@@ -77,7 +77,6 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         SessionChanged?.Invoke(null, "");
         IsDebugging = false;
         FunctionBlocks.Clear();
-        _lastFunc = "";
         _staticDisasm.HighlightFunction(null, null);
     }
 
@@ -88,8 +87,6 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         await Task.Delay(80);
         await RefreshAsync();
     }
-
-    private string _lastFunc = "";
 
     private async Task RefreshAsync()
     {
