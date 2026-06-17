@@ -9,7 +9,8 @@
       "Bash(powershell *)",
       "Bash(dotnet add *)",
       "WebSearch",
-      "Bash(dotnet run *)"
+      "Bash(dotnet run *)",
+      "Bash(dotnet remove *)"
     ]
   }
 }

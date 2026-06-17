@@ -1,6 +1,7 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ElfLens.Core.ViewModels"
+             xmlns:cnv="using:ElfLens.Converters"
              x:Class="ElfLens.Views.DisassemblyPanelView"
              x:DataType="vm:DisassemblyPanelViewModel">
 
@@ -16,16 +17,17 @@
         <ScrollViewer Grid.Row="1"
                       HorizontalScrollBarVisibility="Auto"
                       VerticalScrollBarVisibility="Auto">
-            <TextBox Text="{Binding OutputText}"
-                     IsReadOnly="True"
-                     FontFamily="Cascadia Code, Consolas, Menlo, monospace"
-                     FontSize="12"
-                     Foreground="#E0E0E0"
-                     Background="Transparent"
-                     BorderThickness="0"
-                     AcceptsReturn="True"
-                     TextWrapping="NoWrap"
-                     CaretBrush="Transparent" />
+            <ItemsControl ItemsSource="{Binding Lines}" x:CompileBindings="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:HighlightedLine">
+                        <TextBlock Text="{Binding Text}"
+                                   FontSize="12"
+                                   FontFamily="Cascadia Code, Consolas, Menlo, monospace"
+                                   Margin="0,0,0,0"
+                                   Foreground="{Binding Type, Converter={x:Static cnv:HighlightConverters.LineTypeBrush}}" />
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
         </ScrollViewer>
     </Grid>
 </UserControl>
