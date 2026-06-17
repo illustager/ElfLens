@@ -23,6 +23,7 @@ public partial class MainViewModel : ViewModelBase
     public FileInfoPanelViewModel FileInfoPanel { get; }
     public DisassemblyPanelViewModel DisassemblyPanel { get; }
     public GdbDisasmPanelViewModel GdbDisasmPanel { get; }
+    public BreakpointPanelViewModel BreakpointPanel { get; }
 
     public ObservableCollection<PanelViewModel> LeftPanels { get; } = new();
     public ObservableCollection<PanelViewModel> CenterPanels { get; } = new();
@@ -39,12 +40,22 @@ public partial class MainViewModel : ViewModelBase
         FileInfoPanel = new FileInfoPanelViewModel(_sshService);
         DisassemblyPanel = new DisassemblyPanelViewModel(_sshService);
         GdbDisasmPanel = new GdbDisasmPanelViewModel(_sshService, DisassemblyPanel);
+        BreakpointPanel = new BreakpointPanelViewModel();
         Workspace = new WorkspaceViewModel();
 
         BottomPanels.Add(ShellPanel);
         RightPanels.Add(FileInfoPanel);
+        RightPanels.Add(BreakpointPanel);
         CenterPanels.Add(DisassemblyPanel);
         CenterPanels.Add(GdbDisasmPanel);
+
+        // Notify breakpoints changed → update marks on both panels
+        BreakpointPanel.OnChanged(() =>
+        {
+            var bps = BreakpointPanel.GetFuncBreakpoints();
+            DisassemblyPanel.MarkBreakpoints(bps);
+            GdbDisasmPanel.MarkBreakpoints(bps);
+        });
 
         GdbDisasmPanel.SessionChanged += (session, title) =>
         {
@@ -52,6 +63,7 @@ public partial class MainViewModel : ViewModelBase
             {
                 _gdbShellPanel = new ShellPanelViewModel(session, title);
                 BottomPanels.Add(_gdbShellPanel);
+                BreakpointPanel.SetSession(session);
             }
             else
             {
@@ -60,6 +72,7 @@ public partial class MainViewModel : ViewModelBase
                     BottomPanels.Remove(_gdbShellPanel);
                     _gdbShellPanel = null;
                 }
+                BreakpointPanel.SetSession(null);
             }
         };
     }

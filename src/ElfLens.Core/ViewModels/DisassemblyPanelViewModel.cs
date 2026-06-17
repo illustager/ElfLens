@@ -10,7 +10,7 @@ using ElfLens.Core.Services;
 
 namespace ElfLens.Core.ViewModels;
 
-public record HighlightedLine(List<Token> Tokens, bool IsCurrent = false);
+public record HighlightedLine(List<Token> Tokens, bool IsCurrent = false, bool IsBreakpoint = false);
 
 public partial class FunctionItem : ObservableObject
 {
@@ -74,6 +74,32 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
     /// <summary>Check if a function name/address exists in this panel.</summary>
     public bool HasFunction(string? name) =>
         Functions.Any(f => f.Name == name);
+
+    /// <summary>Mark instruction lines matching (func, offset) breakpoints.</summary>
+    public void MarkBreakpoints(List<(string func, int offset)> bps)
+    {
+        for (int bi = 0; bi < Functions.Count; bi++)
+        {
+            var fb = Functions[bi];
+            var changed = false;
+            var newInsts = new List<HighlightedLine>();
+            int lineIdx = 0;
+            foreach (var line in fb.Instructions)
+            {
+                var isBp = false;
+                foreach (var bp in bps)
+                {
+                    if (fb.Name == bp.func && lineIdx == bp.offset)
+                    { isBp = true; break; }
+                }
+                if (isBp != line.IsBreakpoint) changed = true;
+                newInsts.Add(new HighlightedLine(line.Tokens, line.IsCurrent, isBp));
+                lineIdx++;
+            }
+            if (changed)
+                Functions[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
+        }
+    }
 
     private void ParseObjdump(string output, string? highlightPc = null)
     {

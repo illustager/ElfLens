@@ -1,0 +1,57 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ElfLens.Core.ViewModels"
+             x:Class="ElfLens.Views.BreakpointPanelView"
+             x:DataType="vm:BreakpointPanelViewModel">
+
+    <Grid RowDefinitions="Auto,Auto,*" Margin="4">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4" Margin="0,0,0,6">
+            <TextBox Text="{Binding NewBreakpoint}" PlaceholderText="func+offset" MinWidth="120"
+                     FontSize="12" FontFamily="Cascadia Code, Consolas, monospace" />
+            <Button Content="Add" Command="{Binding AddCommand}" Padding="6,2" FontSize="11" />
+        </StackPanel>
+
+        <TextBlock Grid.Row="1" Text="Click ☑ to toggle, ✕ to remove" FontSize="10"
+                   Opacity="0.4" Margin="0,0,0,4" />
+
+        <ScrollViewer Grid.Row="2">
+            <ItemsControl ItemsSource="{Binding Entries}" x:CompileBindings="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:BreakpointEntry">
+                        <Border Margin="0,0,0,2" Padding="4,2"
+                                Background="{DynamicResource SystemAltMediumLowBrush}"
+                                CornerRadius="2">
+                            <Grid ColumnDefinitions="Auto,*,Auto,Auto" MinHeight="22">
+                                <Button Grid.Column="0" Padding="2,0" Background="Transparent"
+                                        BorderThickness="0" FontSize="13" Width="22"
+                                        Command="{Binding DataContext.ToggleCommand,
+                                            RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding .}">
+                                    <Panel>
+                                        <TextBlock Text="☐" Foreground="#EF5350"
+                                                   IsVisible="{Binding Enabled, Converter={x:Static BoolConverters.Not}}" />
+                                        <TextBlock Text="☑" Foreground="#81C784"
+                                                   IsVisible="{Binding Enabled}" />
+                                    </Panel>
+                                </Button>
+                                <StackPanel Grid.Column="1" Orientation="Horizontal" Spacing="4"
+                                            VerticalAlignment="Center" Margin="4,0">
+                                    <TextBlock Text="{Binding Location}" FontSize="11"
+                                               FontFamily="Cascadia Code, Consolas, monospace" />
+                                    <TextBlock Text="{Binding ResolvedAddr}" FontSize="10"
+                                               Opacity="0.5" FontFamily="Cascadia Code, Consolas, monospace" />
+                                </StackPanel>
+                                <Button Grid.Column="3" Content="✕" Padding="4,0" FontSize="11"
+                                        Background="Transparent" BorderThickness="0"
+                                        Foreground="#EF5350"
+                                        Command="{Binding DataContext.RemoveCommand,
+                                            RelativeSource={RelativeSource AncestorType=UserControl}}"
+                                        CommandParameter="{Binding .}" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

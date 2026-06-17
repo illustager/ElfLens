@@ -62,6 +62,32 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
     public event Action<ShellSession?, string>? SessionChanged;
     public event Action<FunctionItem>? ScrollToBlock;
 
+    /// <summary>Mark instruction lines matching (func, offset) breakpoints.</summary>
+    public void MarkBreakpoints(List<(string func, int offset)> bps)
+    {
+        for (int bi = 0; bi < FunctionBlocks.Count; bi++)
+        {
+            var fb = FunctionBlocks[bi];
+            var changed = false;
+            var newInsts = new List<HighlightedLine>();
+            int lineIdx = 0;
+            foreach (var line in fb.Instructions)
+            {
+                var isBp = false;
+                foreach (var bp in bps)
+                {
+                    if (fb.Name == bp.func && lineIdx == bp.offset)
+                    { isBp = true; break; }
+                }
+                if (isBp != line.IsBreakpoint) changed = true;
+                newInsts.Add(new HighlightedLine(line.Tokens, line.IsCurrent, isBp));
+                lineIdx++;
+            }
+            if (changed)
+                FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
+        }
+    }
+
     public GdbDisasmPanelViewModel(ISshService sshService, DisassemblyPanelViewModel staticDisasm)
     {
         _sshService = sshService;

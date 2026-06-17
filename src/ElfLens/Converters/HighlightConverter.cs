@@ -12,6 +12,7 @@ public static class HighlightConverters
 {
     public static readonly IValueConverter HexToBrush = new HexToBrushConverter();
     public static readonly IValueConverter CurrentBg = new CurrentBgConverter();
+    public static readonly IValueConverter BreakpointBorder = new BreakpointBorderConverter();
     public static readonly IValueConverter FuncHighlightBg = new FuncHighlightBgConverter();
     public static readonly IValueConverter NavCursor = new NavCursorConverter();
     public static readonly IMultiValueConverter PcHighlight = new PcHighlightConverter();
@@ -27,6 +28,17 @@ public static class HighlightConverters
             catch { b = new SolidColorBrush(Colors.White); }
             Cache[hex] = b;
             return b;
+        }
+        public object? ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+    }
+
+    private class BreakpointBorderConverter : IValueConverter
+    {
+        private static readonly SolidColorBrush BpBrush = new(Color.Parse("#F44336"));
+        public object? Convert(object? value, Type t, object? p, CultureInfo c)
+        {
+            if (value is bool isBp && isBp) return BpBrush;
+            return Brushes.Transparent;
         }
         public object? ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
     }

@@ -1,0 +1,159 @@
+using System;
+using System.Collections.Generic;
+using System.Collections.ObjectModel;
+using System.Linq;
+using System.Text.RegularExpressions;
+using System.Threading.Tasks;
+using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using ElfLens.Core.Models;
+
+namespace ElfLens.Core.ViewModels;
+
+public partial class BreakpointEntry : ObservableObject
+{
+    public string Location { get; init; } = "";
+    [ObservableProperty] private bool _enabled = true;
+    [ObservableProperty] private string _gdbNum = ""; // GDB-assigned number after execution
+    [ObservableProperty] private string _resolvedAddr = ""; // resolved address from GDB
+    [ObservableProperty] private string _resolvedFunc = ""; // resolved function name
+}
+
+public partial class BreakpointPanelViewModel : PanelViewModel
+{
+    public override string Title => "Breakpoints";
+    public override PanelZone Zone => PanelZone.Right;
+
+    [ObservableProperty] private string _newBreakpoint = "";
+    [ObservableProperty] private bool _hasSession;
+
+    public ObservableCollection<BreakpointEntry> Entries { get; } = new();
+
+    private ShellSession? _session;
+    private Action? _onBreakpointsChanged;
+
+    public void SetSession(ShellSession? session)
+    {
+        _session = session;
+        HasSession = session != null;
+        if (session != null)
+            _ = BatchApplyAsync();
+    }
+
+    public void OnChanged(Action callback) => _onBreakpointsChanged = callback;
+
+    [RelayCommand]
+    private void Add()
+    {
+        var loc = NewBreakpoint.Trim();
+        if (loc.Length == 0) return;
+        Entries.Add(new BreakpointEntry { Location = loc });
+        NewBreakpoint = "";
+        NotifyChanged();
+        if (_session != null) _ = ApplySingleAsync(loc);
+    }
+
+    [RelayCommand]
+    private void Remove(BreakpointEntry? entry)
+    {
+        if (entry == null) return;
+        if (_session != null && entry.GdbNum.Length > 0)
+            _ = _session.SendCommandAsync($"delete {entry.GdbNum}");
+        Entries.Remove(entry);
+        NotifyChanged();
+    }
+
+    [RelayCommand]
+    private void Toggle(BreakpointEntry? entry)
+    {
+        if (entry == null) return;
+        entry.Enabled = !entry.Enabled;
+        if (_session != null && entry.GdbNum.Length > 0)
+            _ = _session.SendCommandAsync(entry.Enabled
+                ? $"enable {entry.GdbNum}"
+                : $"disable {entry.GdbNum}");
+        NotifyChanged();
+    }
+
+    private async Task BatchApplyAsync()
+    {
+        if (_session == null) return;
+        foreach (var e in Entries.Where(e => e.Enabled))
+            await ApplySingleAsync(e.Location);
+        await RefreshFromGdbAsync();
+    }
+
+    private async Task ApplySingleAsync(string loc)
+    {
+        if (_session == null) return;
+        // Capture the break command output to get assigned number
+        var output = new List<string>();
+        var done = new TaskCompletionSource<bool>();
+        void H(string c) { output.Add(c); if (output.Any(s => s.Contains("Breakpoint"))) done.TrySetResult(true); }
+        _session.OnOutput += H;
+        await _session.SendCommandAsync($"break {loc}");
+        await Task.WhenAny(done.Task, Task.Delay(800));
+        _session.OnOutput -= H;
+    }
+
+    public async Task RefreshFromGdbAsync()
+    {
+        if (_session == null || !HasSession) return;
+        var text = new List<string>();
+        var done = new TaskCompletionSource<bool>();
+        void H(string c) { text.Add(c); if (text.Any(s => s.Contains("No breakpoints") || text.Sum(x => x.Length) > 5000)) done.TrySetResult(true); }
+        _session.OnOutput += H;
+        await _session.SendCommandAsync("info breakpoints");
+        await Task.WhenAny(done.Task, Task.Delay(800));
+        _session.OnOutput -= H;
+
+        var output = string.Join("", text);
+        if (output.Contains("No breakpoints"))
+        {
+            foreach (var e in Entries) { e.GdbNum = ""; e.ResolvedAddr = ""; e.ResolvedFunc = ""; }
+            return;
+        }
+
+        // Parse: "1   breakpoint     keep y   0x00007ffff7fe3290 in _start at ..."
+        var rx = new Regex(@"^(\d+)\s+breakpoint\s+keep\s+([yn])\s+(0x[0-9a-f]+)\s+in\s+(\S+)",
+            RegexOptions.Multiline | RegexOptions.IgnoreCase);
+        foreach (Match m in rx.Matches(output))
+        {
+            var addr = m.Groups[3].Value;
+            var func = m.Groups[4].Value;
+            var enabled = m.Groups[2].Value == "y";
+            // Try to match against our entries by resolved function
+            foreach (var e in Entries)
+            {
+                if (e.Location.Contains(func) || e.Location == func || e.Location == "*" + addr)
+                {
+                    e.GdbNum = m.Groups[1].Value;
+                    e.ResolvedAddr = addr;
+                    e.ResolvedFunc = func;
+                    e.Enabled = enabled;
+                }
+            }
+        }
+        NotifyChanged();
+    }
+
+    private void NotifyChanged() => _onBreakpointsChanged?.Invoke();
+
+    /// <summary>Returns addresses (hex strings) from func/offset-type breakpoints for marking.</summary>
+    public List<(string func, int offset)> GetFuncBreakpoints()
+    {
+        var result = new List<(string, int)>();
+        foreach (var e in Entries.Where(e => e.Enabled))
+        {
+            var loc = e.Location;
+            // func+offset
+            var m = Regex.Match(loc, @"^([a-zA-Z_]\w*)\+(\d+)$");
+            if (m.Success) { result.Add((m.Groups[1].Value, int.Parse(m.Groups[2].Value))); continue; }
+            // func only
+            var m2 = Regex.Match(loc, @"^([a-zA-Z_]\w*)$");
+            if (m2.Success) { result.Add((m2.Groups[1].Value, 0)); continue; }
+            // *addr — skip for marking
+        }
+        return result;
+    }
+}
