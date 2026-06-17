@@ -130,7 +130,6 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
             var funcName = nameM.Success ? nameM.Groups[1].Value
                 : (pcAddr.Length > 0 ? "0x" + pcAddr : "??");
             CurrentFunction = funcName;
-            CurrentPc = pcAddr;
 
             if (!FunctionBlocks.Any(f => f.Name == funcName))
             {
@@ -141,6 +140,8 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 if (block != null)
                     FunctionBlocks.Add(block);
             }
+
+            CurrentPc = pcAddr;
 
             if (_staticDisasm.HasFunction(funcName))
                 _staticDisasm.HighlightFunction(funcName, pcAddr);
