@@ -311,6 +311,13 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 // Use spaces not tabs — matches objdump format that Tokenize expects
                 // Tokenize GDB output directly: addr + bytes + mnemonic + operands
                 var tokens = TokenizeGdbLine(addr, body);
+                if (insts.Count < 3)
+                {
+                    try { System.IO.File.AppendAllText(
+                        System.IO.Path.Combine(System.AppContext.BaseDirectory, "gdb_tokens.log"),
+                        $"BODY: [{body}]\nADDR: [{addr}]\nTOKENS:\n{string.Join("\n", tokens.Select(tk => $"  [{tk.Color}] {tk.Text.Replace("\t", "\\t")}"))}\n---\n"); }
+                    catch { }
+                }
                 insts.Add(new HighlightedLine(tokens));
             }
         }
