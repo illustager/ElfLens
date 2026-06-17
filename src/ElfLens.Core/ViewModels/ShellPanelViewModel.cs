@@ -41,8 +41,7 @@ public partial class ShellPanelViewModel : ViewModelBase
             {
                 _session.OnOutput += chunk =>
                     uiCtx?.Post(_ => AppendOutput(chunk), null);
-                _session.OnDisconnected += () =>
-                    uiCtx?.Post(_ => OnDisconnected?.Invoke(), null);
+                _session.OnDisconnected += () => OnDisconnected?.Invoke();
             }
             else AppendOutput("!!! Failed to create shell session\n");
         }

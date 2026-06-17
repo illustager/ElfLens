@@ -47,6 +47,7 @@ public partial class ShellSession : IDisposable
     private async Task ReadLoopAsync(CancellationToken ct)
     {
         var buf = new byte[4096];
+        int idle = 0;
         try
         {
             while (!ct.IsCancellationRequested)
@@ -55,6 +56,7 @@ public partial class ShellSession : IDisposable
                 {
                     if (_shellStream.DataAvailable)
                     {
+                        idle = 0;
                         int n = _shellStream.Read(buf, 0, buf.Length);
                         if (n > 0)
                         {
@@ -67,6 +69,8 @@ public partial class ShellSession : IDisposable
                     }
                     else
                     {
+                        idle++;
+                        if (idle > 300) break; // ~9s idle → dead connection
                         await Task.Delay(30, ct);
                     }
                 }
