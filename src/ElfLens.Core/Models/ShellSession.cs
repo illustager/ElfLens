@@ -16,6 +16,7 @@ public partial class ShellSession : IDisposable
     private readonly StreamWriter _writer;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private CancellationTokenSource? _readCts;
+    private volatile bool _disposed;
 
     public event Action<string>? OnOutput;
     public event Action? OnDisconnected;
@@ -30,13 +31,16 @@ public partial class ShellSession : IDisposable
 
     public async Task SendCommandAsync(string command)
     {
+        if (_disposed) return;
         await _writeLock.WaitAsync();
         try
         {
+            if (_disposed) return;
             if (!command.EndsWith('\n'))
                 command += "\n";
             await _writer.WriteAsync(command.AsMemory());
         }
+        catch (ObjectDisposedException) { }
         finally { _writeLock.Release(); }
     }
 
@@ -47,27 +51,35 @@ public partial class ShellSession : IDisposable
         {
             while (!ct.IsCancellationRequested)
             {
-                if (_shellStream.DataAvailable)
+                try
                 {
-                    int n = _shellStream.Read(buf, 0, buf.Length);
-                    if (n > 0)
+                    if (_shellStream.DataAvailable)
                     {
-                        var raw = Encoding.UTF8.GetString(buf, 0, n);
-                        raw = AnsiRegex().Replace(raw, "");
-                        raw = raw.Replace("\r\n", "\n").Replace("\r", "");
-                        if (raw.Length > 0)
-                            OnOutput?.Invoke(raw);
+                        int n = _shellStream.Read(buf, 0, buf.Length);
+                        if (n > 0)
+                        {
+                            var raw = Encoding.UTF8.GetString(buf, 0, n);
+                            raw = AnsiRegex().Replace(raw, "");
+                            raw = raw.Replace("\r\n", "\n").Replace("\r", "");
+                            if (raw.Length > 0)
+                                OnOutput?.Invoke(raw);
+                        }
+                    }
+                    else
+                    {
+                        await Task.Delay(30, ct);
                     }
                 }
-                else
-                {
-                    await Task.Delay(30, ct);
-                }
+                catch (ObjectDisposedException) { break; }
+                catch (OperationCanceledException) { break; }
+                catch { break; }
             }
         }
-        catch (OperationCanceledException) { }
-        catch (ObjectDisposedException) { }
-        catch { OnDisconnected?.Invoke(); }
+        finally
+        {
+            _disposed = true;
+            OnDisconnected?.Invoke();
+        }
     }
 
     [GeneratedRegex(
@@ -82,6 +94,7 @@ public partial class ShellSession : IDisposable
 
     public void Dispose()
     {
+        _disposed = true;
         _readCts?.Cancel();
         _writer?.Dispose();
         _shellStream?.Dispose();
