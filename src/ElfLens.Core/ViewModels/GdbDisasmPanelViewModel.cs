@@ -206,7 +206,8 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 var addr = gdbInst.Groups[1].Value[2..];
                 firstAddr ??= addr;
                 var body = gdbInst.Groups[3].Value;
-                var normalized = $"  {addr}:\t{body}";
+                // Use spaces not tabs — matches objdump format that Tokenize expects
+                var normalized = $"  {addr}:\t{body}".Replace('\t', ' ');
                 insts.Add(new HighlightedLine(DisassemblyHighlighter.Tokenize(normalized)));
             }
         }
