@@ -21,7 +21,6 @@
                        FontSize="12"
                        WordWrap="False"
                        HorizontalScrollBarVisibility="Auto"
-                       VerticalScrollBarVisibility="Auto"
-                       SyntaxHighlighting="x86 Assembly" />
+                       VerticalScrollBarVisibility="Auto" />
     </Grid>
 </UserControl>

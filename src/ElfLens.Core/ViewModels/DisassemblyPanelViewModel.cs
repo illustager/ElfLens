@@ -17,7 +17,7 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
     [ObservableProperty] private string _targetPath = "";
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _functionCount = "";
-    [ObservableProperty] private string _outputText = "";
+    [ObservableProperty] private string _outputText = "Loading...";
 
     public DisassemblyPanelViewModel(ISshService sshService)
     {
