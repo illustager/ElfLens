@@ -77,8 +77,6 @@ public partial class ShellPanelViewModel : ViewModelBase
         _commandHistory.Add(command);
         _historyIndex = _commandHistory.Count;
 
-        // Echo the command
-        OutputLines.Add(new ShellOutputLine($"{Prompt}{command}", ShellOutputType.Command));
         InputCommand = string.Empty;
 
         if (_session == null)
@@ -91,10 +89,6 @@ public partial class ShellPanelViewModel : ViewModelBase
         try
         {
             var output = await _session.ExecuteCommandAsync(command);
-
-            // Sync prompt to match the remote shell context (e.g. $ → >>> → pwndbg>)
-            Prompt = _session.DetectedPrompt;
-
             if (!string.IsNullOrEmpty(output))
             {
                 foreach (var line in output.Split('\n'))
