@@ -139,19 +139,11 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 : (pcAddr.Length > 0 ? "0x" + pcAddr : "??");
             CurrentFunction = funcName;
 
-            var isNew = !FunctionBlocks.Any(f => f.Name == funcName);
-            try { System.IO.File.AppendAllText(
-                System.IO.Path.Combine(System.AppContext.BaseDirectory, "gdb_parse.log"),
-                $"FUNC: {funcName} PC: {pcAddr} NEW: {isNew} BLOCKS: {FunctionBlocks.Count}\n"); } catch { }
-
-            if (isNew)
+            if (!FunctionBlocks.Any(f => f.Name == funcName))
             {
                 var asm = string.IsNullOrEmpty(pcAddr)
                     ? await Capture("disassemble /r")
                     : await Capture($"disassemble /r 0x{pcAddr}");
-                try { System.IO.File.AppendAllText(
-                    System.IO.Path.Combine(System.AppContext.BaseDirectory, "gdb_parse.log"),
-                    $"ASM LEN: {asm.Length}\n"); } catch { }
                 var block = ParseGdbBlock(asm, funcName, pcAddr);
                 if (block != null)
                 {
@@ -323,15 +315,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 var body = gdbInst.Groups[3].Value;
                 // Use spaces not tabs — matches objdump format that Tokenize expects
                 // Tokenize GDB output directly: addr + bytes + mnemonic + operands
-                var tokens = TokenizeGdbLine(addr, body);
-                if (insts.Count < 3)
-                {
-                    try { System.IO.File.AppendAllText(
-                        System.IO.Path.Combine(System.AppContext.BaseDirectory, "gdb_tokens.log"),
-                        $"BODY: [{body}]\nADDR: [{addr}]\nTOKENS:\n{string.Join("\n", tokens.Select(tk => $"  [{tk.Color}] {tk.Text.Replace("\t", "\\t")}"))}\n---\n"); }
-                    catch { }
-                }
-                insts.Add(new HighlightedLine(tokens));
+                insts.Add(new HighlightedLine(TokenizeGdbLine(addr, body)));
             }
         }
 
