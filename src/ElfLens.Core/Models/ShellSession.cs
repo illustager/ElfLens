@@ -115,30 +115,54 @@ public partial class ShellSession : IDisposable
         var lines = text.Split('\n');
         var sb = new StringBuilder();
         string? prevNonBlank = null;
+        int pendingBlanks = 0;
 
+        // First pass: collect lines with dedup info
+        var cleanLines = new List<(string Line, bool IsBlank)>();
         foreach (var line in lines)
         {
-            bool isBlank = line.Trim().Length == 0;
+            var isBlank = line.Trim().Length == 0;
+            cleanLines.Add((line, isBlank));
+        }
+
+        for (int i = 0; i < cleanLines.Count; i++)
+        {
+            var (line, isBlank) = cleanLines[i];
 
             if (isBlank)
             {
-                // Keep at most one blank line between content
-                if (sb.Length > 0 && !sb.ToString().EndsWith("\n\n"))
-                    sb.AppendLine();
+                // Look ahead: if this blank is followed by a line identical to prevNonBlank,
+                // skip both the blank and the duplicate (eliminates "prompt\n\nprompt")
+                if (prevNonBlank != null && i + 1 < cleanLines.Count)
+                {
+                    var (nextLine, nextBlank) = cleanLines[i + 1];
+                    if (!nextBlank && nextLine == prevNonBlank)
+                    {
+                        i++; // skip the duplicate too
+                        continue; // skip this blank
+                    }
+                }
+                pendingBlanks++;
                 continue;
             }
 
-            // Skip duplicate consecutive non-blank lines (eliminates doubled prompts)
+            // Skip duplicate consecutive non-blank lines
             if (line == prevNonBlank)
+            {
+                pendingBlanks = 0;
                 continue;
+            }
+
+            // Emit at most one blank line
+            if (pendingBlanks > 0 && sb.Length > 0)
+                sb.AppendLine();
+            pendingBlanks = 0;
 
             prevNonBlank = line;
             sb.AppendLine(line);
         }
 
-        // Trim trailing newlines only, preserving prompt space
-        var result = sb.ToString();
-        result = result.TrimEnd('\n');
+        var result = sb.ToString().TrimEnd('\n');
         return result.Length > 0 ? result : "(no output)";
     }
 
