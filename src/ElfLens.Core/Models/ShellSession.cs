@@ -163,6 +163,7 @@ public partial class ShellSession : IDisposable
         }
 
         var result = sb.ToString().TrimEnd('\n');
+        DebugLog("CLEAN", result);
         return result.Length > 0 ? result : "(no output)";
     }
 
