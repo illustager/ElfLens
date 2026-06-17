@@ -1,7 +1,6 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ElfLens.Core.ViewModels"
-             xmlns:ae="using:AvaloniaEdit"
              x:Class="ElfLens.Views.DisassemblyPanelView"
              x:DataType="vm:DisassemblyPanelViewModel">
 
@@ -14,13 +13,19 @@
                        VerticalAlignment="Center" Opacity="0.7" />
         </StackPanel>
 
-        <ae:TextEditor Grid.Row="1" x:Name="Editor"
-                       IsReadOnly="True"
-                       ShowLineNumbers="True"
-                       FontFamily="Cascadia Code, Consolas, Menlo, monospace"
-                       FontSize="12"
-                       WordWrap="False"
-                       HorizontalScrollBarVisibility="Auto"
-                       VerticalScrollBarVisibility="Auto" />
+        <ScrollViewer Grid.Row="1"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+            <TextBox Text="{Binding OutputText}"
+                     IsReadOnly="True"
+                     FontFamily="Cascadia Code, Consolas, Menlo, monospace"
+                     FontSize="12"
+                     Foreground="#E0E0E0"
+                     Background="Transparent"
+                     BorderThickness="0"
+                     AcceptsReturn="True"
+                     TextWrapping="NoWrap"
+                     CaretBrush="Transparent" />
+        </ScrollViewer>
     </Grid>
 </UserControl>
