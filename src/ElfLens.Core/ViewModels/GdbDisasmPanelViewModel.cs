@@ -105,6 +105,8 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
             var funcName = nameM.Success ? nameM.Groups[1].Value : "";
             CurrentFunction = funcName;
 
+            ClearAllHighlights();
+
             // Add new function if not already in blocks
             if (!FunctionBlocks.Any(f => f.Name == funcName))
             {
@@ -120,11 +122,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 }
             }
 
-            else
-            {
-                ClearAllHighlights();
-                HighlightCurrent(pcAddr, funcName);
-            }
+            HighlightCurrent(pcAddr, funcName);
 
             if (_staticDisasm.HasFunction(funcName))
                 _staticDisasm.HighlightFunction(funcName, pcAddr);
