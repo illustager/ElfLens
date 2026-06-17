@@ -187,21 +187,26 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
 
     private static List<Token> TokenizeGdbLine(string addr, string body)
     {
-        // Format: "f3 0f 1e fa    endbr64 " or "f3 0f 1e fa    endbr64     # comment"
-        var tokens = new List<Token> { new($"  {addr}:\t", "#546E7A") };
+        // Format: "f3 0f 1e fa\tendbr64 " — bytes then tab then mnemonic
+        var tokens = new List<Token>();
+        // Address token: padded to fixed width for alignment
+        tokens.Add(new Token($"  {addr}:\t", "#546E7A"));
 
         var m = Regex.Match(body, @"^((?:[0-9a-f]{2}\s)*[0-9a-f]{2})(\s+)([a-z]\w*)((?:\s+.*?)?)(\s*#.*)?$", RegexOptions.IgnoreCase);
         if (m.Success)
         {
-            tokens.Add(new Token(m.Groups[1].Value, "#546E7A"));  // bytes
-            if (m.Groups[2].Value.Length > 0)
-                tokens.Add(new Token(m.Groups[2].Value, "#B0BEC5")); // padding
+            // Bytes: pad to 24 chars for alignment (covers up to 8 hex pairs + spaces)
+            var bytes = m.Groups[1].Value.PadRight(24);
+            tokens.Add(new Token(bytes, "#546E7A"));
+            // Mnemonic
             var mnem = m.Groups[3].Value.ToLower();
-            tokens.Add(new Token(m.Groups[3].Value, MnemColor(mnem))); // mnemonic
+            tokens.Add(new Token(m.Groups[3].Value, MnemColor(mnem)));
+            // Operands
             if (m.Groups[4].Value.Length > 0)
-                TokenizeOperands(m.Groups[4].Value, tokens);  // operands
+                TokenizeOperands(m.Groups[4].Value, tokens);
+            // Comment
             if (m.Groups[5].Success)
-                tokens.Add(new Token(m.Groups[5].Value, "#6A9955")); // comment
+                tokens.Add(new Token(m.Groups[5].Value, "#6A9955"));
         }
         else
         {
