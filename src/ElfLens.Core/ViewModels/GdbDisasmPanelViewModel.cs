@@ -177,6 +177,83 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         return string.Join("", sb);
     }
 
+    private static List<Token> TokenizeGdbLine(string addr, string body)
+    {
+        // Format: "f3 0f 1e fa    endbr64 " or "f3 0f 1e fa    endbr64     # comment"
+        var tokens = new List<Token> { new($"  {addr}:\t", "#546E7A") };
+
+        var m = Regex.Match(body, @"^((?:[0-9a-f]{2}\s)+)(\s+)([a-z]\w*)((?:\s+.*?)?)(\s*#.*)?$", RegexOptions.IgnoreCase);
+        if (m.Success)
+        {
+            tokens.Add(new Token(m.Groups[1].Value, "#546E7A"));  // bytes
+            if (m.Groups[2].Value.Length > 0)
+                tokens.Add(new Token(m.Groups[2].Value, "#B0BEC5")); // padding
+            var mnem = m.Groups[3].Value.ToLower();
+            tokens.Add(new Token(m.Groups[3].Value, MnemColor(mnem))); // mnemonic
+            if (m.Groups[4].Value.Length > 0)
+                TokenizeOperands(m.Groups[4].Value, tokens);  // operands
+            if (m.Groups[5].Success)
+                tokens.Add(new Token(m.Groups[5].Value, "#6A9955")); // comment
+        }
+        else
+        {
+            tokens.Add(new Token(body, "#B0BEC5"));
+        }
+        return tokens;
+    }
+
+    private static string MnemColor(string m)
+    {
+        if (m is "call") return "#81C784";
+        if (m is "ret" or "retn" or "retf" or "iret" or "iretq") return "#EF5350";
+        if (m.StartsWith('j') || m is "loop" or "loope" or "loopne") return "#FFB74D";
+        return "#B0BEC5";
+    }
+
+    private static void TokenizeOperands(string text, List<Token> tokens)
+    {
+        int p = 0;
+        while (p < text.Length)
+        {
+            // Register: %rax, %rsp, etc.
+            var regM = Regex.Match(text[p..], @"^%[a-z][a-z0-9]*");
+            if (regM.Success)
+            {
+                if (p < regM.Index + p) tokens.Add(new Token(text[p..(p + regM.Index)], "#B0BEC5"));
+                tokens.Add(new Token(regM.Value, "#CE93D8"));
+                p += regM.Index + regM.Length;
+                continue;
+            }
+            // Hex: 0x...
+            var hexM = Regex.Match(text[p..], @"^0x[0-9a-f]+");
+            if (hexM.Success)
+            {
+                if (p < hexM.Index + p) tokens.Add(new Token(text[p..(p + hexM.Index)], "#B0BEC5"));
+                tokens.Add(new Token(hexM.Value, "#FFE082"));
+                p += hexM.Index + hexM.Length;
+                continue;
+            }
+            // Angle bracket ref: <name>
+            var refM = Regex.Match(text[p..], @"^<[^>]+>");
+            if (refM.Success)
+            {
+                if (p < refM.Index + p) tokens.Add(new Token(text[p..(p + refM.Index)], "#B0BEC5"));
+                tokens.Add(new Token(refM.Value, "#4FC3F7"));
+                p += refM.Index + refM.Length;
+                continue;
+            }
+            // Advance to next special char
+            int next = text.Length;
+            foreach (var rx in new[] { @"%[a-z][a-z0-9]*", @"0x[0-9a-f]+", @"<[^>]+>" })
+            {
+                var m2 = Regex.Match(text[p..], rx);
+                if (m2.Success && m2.Index + p < next) next = m2.Index + p;
+            }
+            if (next > p) { tokens.Add(new Token(text[p..next], "#B0BEC5")); p = next; }
+            else p++;
+        }
+    }
+
     private FunctionItem? ParseGdbBlock(string output, string funcName, string? currentPc)
     {
         var insts = new List<HighlightedLine>();
@@ -207,16 +284,8 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 firstAddr ??= addr;
                 var body = gdbInst.Groups[3].Value;
                 // Use spaces not tabs — matches objdump format that Tokenize expects
-                var normalized = $"  {addr}:\t{body}".Replace('\t', ' ');
-                var tokens = DisassemblyHighlighter.Tokenize(normalized);
-                // Diagnostic: log first parse to file
-                if (insts.Count == 0)
-                {
-                    try { System.IO.File.AppendAllText(
-                        System.IO.Path.Combine(System.AppContext.BaseDirectory, "gdb_parse.log"),
-                        $"NORM: {normalized}\nTOKENS: {string.Join(" | ", tokens.Select(tk => $"{tk.Text}[{tk.Color}]"))}\n\n"); }
-                    catch { }
-                }
+                // Tokenize GDB output directly: addr + bytes + mnemonic + operands
+                var tokens = TokenizeGdbLine(addr, body);
                 insts.Add(new HighlightedLine(tokens));
             }
         }
