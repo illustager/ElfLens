@@ -11,6 +11,14 @@
             <Setter Property="Background" Value="#2A3A2A" />
             <Setter Property="Foreground" Value="#81C784" />
         </Style>
+        <Style Selector="Button.token">
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="0" />
+            <Setter Property="Padding" Value="0" />
+        </Style>
+        <Style Selector="Button.token:pointerover /template/ ContentPresenter">
+            <Setter Property="Background" Value="Transparent" />
+        </Style>
         <Style Selector="Button.start">
             <Setter Property="Background" Value="#1A3A1A" />
             <Setter Property="Foreground" Value="#4CAF50" />
@@ -94,7 +102,7 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:HighlightedLine">
                                             <Border Background="{Binding IsCurrent, Converter={x:Static cnv:HighlightConverters.CurrentBg}}"
-                                                    CornerRadius="2" Margin="0,0,0,0">
+                                                    CornerRadius="0" Margin="0,0,0,0">
                                                 <ItemsControl ItemsSource="{Binding Tokens}" x:CompileBindings="False">
                                                     <ItemsControl.ItemsPanel>
                                                         <ItemsPanelTemplate>
@@ -103,7 +111,7 @@
                                                     </ItemsControl.ItemsPanel>
                                                     <ItemsControl.ItemTemplate>
                                                         <DataTemplate x:DataType="core:Token">
-                                                            <Button Padding="0" BorderThickness="0" Background="Transparent"
+                                                            <Button Padding="0" BorderThickness="0" Classes="token"
                                                                     Command="{Binding DataContext.NavigateCommand, RelativeSource={RelativeSource AncestorType=UserControl}}"
                                                                     CommandParameter="{Binding NavigateTo}"
                                                                     IsEnabled="{Binding NavigateTo, Converter={x:Static ObjectConverters.IsNotNull}}"
