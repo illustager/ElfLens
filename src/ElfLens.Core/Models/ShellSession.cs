@@ -15,6 +15,7 @@ public partial class ShellSession : IDisposable
     private readonly ShellStream _shellStream;
     private readonly StreamWriter _writer;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
+    private CancellationTokenSource? _readCts;
 
     public string Prompt { get; private set; } = "$ ";
 
@@ -27,6 +28,10 @@ public partial class ShellSession : IDisposable
         _writer.WriteLine();
         Thread.Sleep(400);
         CapturePrompt();
+
+        // Start background read loop
+        _readCts = new CancellationTokenSource();
+        _ = Task.Run(() => ReadLoopAsync(_readCts.Token));
     }
 
     private void CapturePrompt()
@@ -42,20 +47,73 @@ public partial class ShellSession : IDisposable
         }
     }
 
-    public async Task ExecuteCommandAsync(
-        string command,
-        Action<string> onChunk,
-        CancellationToken ct = default)
+    /// <summary>Fires for every chunk of cleaned output from the shell.</summary>
+    public event Action<string>? OnOutput;
+
+    /// <summary>
+    /// Sends a command to the shell and returns immediately.
+    /// Output arrives asynchronously via OnOutput.
+    /// </summary>
+    public async Task SendCommandAsync(string command)
     {
-        await _writeLock.WaitAsync(ct);
+        await _writeLock.WaitAsync();
         try
         {
             var line = command.EndsWith('\n') ? command : command + "\n";
-            await _writer.WriteAsync(line.AsMemory(), ct);
-            await ReadChunksAsync(onChunk, ct);
+            await _writer.WriteAsync(line.AsMemory());
         }
         finally { _writeLock.Release(); }
     }
+
+    // ---- background read ----
+
+    private async Task ReadLoopAsync(CancellationToken ct)
+    {
+        var buf = new byte[4096];
+        bool prevEndsWithNewline = false;
+        var accum = new StringBuilder();
+
+        try
+        {
+            while (!ct.IsCancellationRequested)
+            {
+                if (_shellStream.DataAvailable)
+                {
+                    int n = _shellStream.Read(buf, 0, buf.Length);
+                    if (n > 0)
+                    {
+                        var raw = Encoding.UTF8.GetString(buf, 0, n);
+                        var clean = AnsiRegex().Replace(raw, "");
+                        clean = clean.Replace("\r\n", "\n").Replace('\r', '\n');
+                        clean = MultipleNewlineRegex().Replace(clean, "\n");
+
+                        if (prevEndsWithNewline && clean.StartsWith('\n'))
+                            clean = clean[1..];
+
+                        if (clean.Length > 0)
+                        {
+                            prevEndsWithNewline = clean[^1] == '\n';
+                            accum.Append(clean);
+                            OnOutput?.Invoke(clean);
+
+                            // Update prompt from last line
+                            var text = accum.ToString().TrimEnd('\n');
+                            var last = text.Split('\n')[^1].Trim();
+                            if (last.Length > 0) Prompt = last;
+                        }
+                    }
+                }
+                else
+                {
+                    await Task.Delay(30, ct);
+                }
+            }
+        }
+        catch (OperationCanceledException) { }
+        catch (ObjectDisposedException) { }
+    }
+
+    // ---- helpers ----
 
     private string ReadAvailable()
     {
@@ -88,61 +146,6 @@ public partial class ShellSession : IDisposable
         }
     }
 
-    private async Task ReadChunksAsync(Action<string> onChunk, CancellationToken ct)
-    {
-        var buf = new byte[4096];
-        bool prevEndsWithNewline = false;
-        // Accumulated cleaned text for prompt detection
-        var accum = new StringBuilder();
-        const int maxIdle = 20; // 1 second fallback
-        int idle = 0;
-
-        while (!ct.IsCancellationRequested)
-        {
-            bool gotData = false;
-            while (_shellStream.DataAvailable)
-            {
-                int n = _shellStream.Read(buf, 0, buf.Length);
-                if (n <= 0) break;
-
-                gotData = true;
-                var raw = Encoding.UTF8.GetString(buf, 0, n);
-                var clean = AnsiRegex().Replace(raw, "");
-                clean = clean.Replace("\r\n", "\n").Replace('\r', '\n');
-                clean = MultipleNewlineRegex().Replace(clean, "\n");
-
-                if (prevEndsWithNewline && clean.StartsWith('\n'))
-                    clean = clean[1..];
-
-                if (clean.Length == 0) continue;
-
-                prevEndsWithNewline = clean[^1] == '\n';
-                onChunk(clean);
-                accum.Append(clean);
-            }
-
-            if (gotData)
-            {
-                idle = 0;
-                // Check if the accumulated output ends with the known prompt
-                var text = accum.ToString().TrimEnd('\n');
-                if (text.EndsWith(Prompt, StringComparison.Ordinal))
-                    break; // prompt appeared → command done
-            }
-            else
-            {
-                idle++;
-                if (idle >= maxIdle) break; // 1s fallback
-            }
-            await Task.Delay(50, ct);
-        }
-
-        // Update prompt from last line (handles changes like shell → GDB → Python)
-        var final = accum.ToString().TrimEnd('\n');
-        var last = final.Split('\n')[^1].Trim();
-        if (last.Length > 0) Prompt = last;
-    }
-
     [GeneratedRegex(
         @"\x1b\[[0-9;?]*[a-zA-Z]|" +
         @"\x1b\][^\x07]*\x07|" +
@@ -158,6 +161,7 @@ public partial class ShellSession : IDisposable
 
     public void Dispose()
     {
+        _readCts?.Cancel();
         _writer?.Dispose();
         _shellStream?.Dispose();
     }

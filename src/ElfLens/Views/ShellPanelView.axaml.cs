@@ -8,7 +8,7 @@ public partial class ShellPanelView : UserControl
     public ShellPanelView()
     {
         InitializeComponent();
-        OutputBox.PropertyChanged += (s, e) =>
+        OutputBox.PropertyChanged += (_, e) =>
         {
             if (e.Property == TextBox.TextProperty)
                 OutputBox.CaretIndex = OutputBox.Text?.Length ?? 0;
@@ -18,11 +18,10 @@ public partial class ShellPanelView : UserControl
     protected override void OnKeyDown(KeyEventArgs e)
     {
         base.OnKeyDown(e);
-
         if (e.Key == Key.Enter && DataContext is Core.ViewModels.ShellPanelViewModel vm)
         {
-            if (vm.ExecuteCommandCommand.CanExecute(null))
-                vm.ExecuteCommandCommand.Execute(null);
+            if (vm.SendCommandCommand.CanExecute(null))
+                vm.SendCommandCommand.Execute(null);
             e.Handled = true;
         }
     }

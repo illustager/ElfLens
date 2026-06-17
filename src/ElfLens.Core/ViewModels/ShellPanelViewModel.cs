@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
@@ -18,7 +19,6 @@ public partial class ShellPanelViewModel : ViewModelBase
     private readonly StringBuilder _outputBuffer = new();
 
     [ObservableProperty] private string _inputCommand = string.Empty;
-    [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private string _prompt = "$ ";
     [ObservableProperty] private string _outputText = string.Empty;
 
@@ -31,7 +31,7 @@ public partial class ShellPanelViewModel : ViewModelBase
     private async Task InitializeAsync()
     {
         if (_session != null) return;
-        IsBusy = true;
+        var uiCtx = SynchronizationContext.Current;
         try
         {
             _session = await _sshService.CreateShellSessionAsync();
@@ -39,15 +39,22 @@ public partial class ShellPanelViewModel : ViewModelBase
             {
                 Prompt = _session.Prompt + " ";
                 AppendOutput(Prompt);
+                _session.OnOutput += chunk =>
+                {
+                    uiCtx?.Post(_ =>
+                    {
+                        AppendOutput(chunk);
+                        Prompt = _session.Prompt + " ";
+                    }, null);
+                };
             }
             else AppendOutput("!!! Failed to create shell session\n");
         }
         catch (Exception ex) { AppendOutput($"!!! Error: {ex.Message}\n"); }
-        finally { IsBusy = false; }
     }
 
-    [RelayCommand(CanExecute = nameof(CanExecuteCommand))]
-    private async Task ExecuteCommandAsync()
+    [RelayCommand]
+    private async Task SendCommand()
     {
         var command = InputCommand.Trim();
         if (string.IsNullOrEmpty(command)) return;
@@ -58,17 +65,12 @@ public partial class ShellPanelViewModel : ViewModelBase
 
         if (_session == null) { AppendOutput("!!! Shell not initialized\n"); return; }
 
-        IsBusy = true;
         try
         {
-            await _session.ExecuteCommandAsync(command, chunk => AppendOutput(chunk));
-            Prompt = _session.Prompt + " ";
+            await _session.SendCommandAsync(command);
         }
         catch (Exception ex) { AppendOutput($"!!! Error: {ex.Message}\n"); }
-        finally { IsBusy = false; }
     }
-
-    private bool CanExecuteCommand() => !IsBusy && !string.IsNullOrWhiteSpace(InputCommand);
 
     private void AppendOutput(string text)
     {

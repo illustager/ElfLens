@@ -46,8 +46,6 @@ public partial class MainViewModel : ViewModelBase
         await Task.Delay(500); // Brief delay for UI to render
         await ShellPanel.InitializeCommand.ExecuteAsync(null);
 
-        ConnectionStatus = ShellPanel.IsBusy == false
-            ? $"Connected to {info.Host}"
-            : $"Connected to {info.Host} — shell ready";
+        ConnectionStatus = $"Connected to {info.Host}";
     }
 }

@@ -1,64 +1,37 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ElfLens.Core.ViewModels"
-             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
-             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
-             mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="300"
              x:Class="ElfLens.Views.ShellPanelView"
              x:DataType="vm:ShellPanelViewModel">
 
-    <Design.DataContext>
-        <vm:ShellPanelViewModel/>
-    </Design.DataContext>
-
     <Grid RowDefinitions="*,Auto" Background="#1E1E1E">
 
-        <!-- Output Area — read-only TextBox, copyable, natural text flow -->
-        <TextBox Grid.Row="0"
-                 x:Name="OutputBox"
+        <TextBox Grid.Row="0" x:Name="OutputBox"
                  Text="{Binding OutputText}"
-                 IsReadOnly="True"
-                 AcceptsReturn="True"
+                 IsReadOnly="True" AcceptsReturn="True"
                  FontFamily="Cascadia Code, Consolas, Menlo, monospace"
-                 FontSize="13"
-                 Foreground="#E0E0E0"
-                 Background="Transparent"
-                 BorderThickness="0"
-                 Padding="8,4"
-                 TextWrapping="Wrap"
+                 FontSize="13" Foreground="#E0E0E0"
+                 Background="Transparent" BorderThickness="0"
+                 Padding="8,4" TextWrapping="Wrap"
                  CaretBrush="Transparent" />
 
-        <!-- Input Area -->
-        <Border Grid.Row="1"
-                Padding="8,4"
+        <Border Grid.Row="1" Padding="8,4"
                 Background="#2D2D2D"
-                BorderBrush="#3E3E3E"
-                BorderThickness="0,1,0,0">
+                BorderBrush="#3E3E3E" BorderThickness="0,1,0,0">
             <Grid ColumnDefinitions="Auto,*,Auto">
-                <TextBlock Grid.Column="0"
-                           Text="{Binding Prompt}"
+                <TextBlock Grid.Column="0" Text="{Binding Prompt}"
                            FontFamily="Cascadia Code, Consolas, Menlo, monospace"
-                           FontSize="13"
-                           Foreground="#81C784"
-                           VerticalAlignment="Center"
-                           Margin="0,0,6,0" />
+                           FontSize="13" Foreground="#81C784"
+                           VerticalAlignment="Center" Margin="0,0,6,0" />
 
-                <TextBox Grid.Column="1"
-                         Text="{Binding InputCommand}"
+                <TextBox Grid.Column="1" Text="{Binding InputCommand}"
                          FontFamily="Cascadia Code, Consolas, Menlo, monospace"
-                         FontSize="13"
-                         Background="Transparent"
-                         BorderThickness="0"
-                         Foreground="#E0E0E0"
-                         CaretBrush="#E0E0E0"
-                         IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
+                         FontSize="13" Background="Transparent" BorderThickness="0"
+                         Foreground="#E0E0E0" CaretBrush="#E0E0E0" />
 
-                <Button Grid.Column="2"
-                        Content="Send"
-                        Command="{Binding ExecuteCommandCommand}"
-                        Padding="8,2" Margin="8,0,0,0"
-                        FontSize="12"
-                        IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
+                <Button Grid.Column="2" Content="Send"
+                        Command="{Binding SendCommandCommand}"
+                        Padding="8,2" Margin="8,0,0,0" FontSize="12" />
             </Grid>
         </Border>
 
