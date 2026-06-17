@@ -100,12 +100,19 @@
                        IsVisible="{Binding ErrorMessage, Converter={x:Static ObjectConverters.IsNotNull}}" />
 
             <!-- Connect Button -->
-            <Button Content="Connect"
-                    Command="{Binding ConnectCommand}"
+            <Button Command="{Binding ConnectCommand}"
                     HorizontalAlignment="Stretch"
                     HorizontalContentAlignment="Center"
                     Padding="12,10" FontSize="15" FontWeight="SemiBold"
-                    Classes="accent" />
+                    Classes="accent"
+                    IsEnabled="{Binding IsConnecting, Converter={x:Static BoolConverters.Not}}">
+                <Panel>
+                    <TextBlock Text="Connect"
+                               IsVisible="{Binding IsConnecting, Converter={x:Static BoolConverters.Not}}" />
+                    <TextBlock Text="Connecting…"
+                               IsVisible="{Binding IsConnecting}" />
+                </Panel>
+            </Button>
 
         </StackPanel>
     </Border>

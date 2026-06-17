@@ -1,0 +1,87 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ElfLens.Core.ViewModels"
+             xmlns:cnv="using:ElfLens.Converters"
+             xmlns:d="http://schemas.microsoft.com/expression/blend/2008"
+             xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"
+             mc:Ignorable="d" d:DesignWidth="600" d:DesignHeight="300"
+             x:Class="ElfLens.Views.ShellPanelView"
+             x:DataType="vm:ShellPanelViewModel">
+
+    <Design.DataContext>
+        <vm:ShellPanelViewModel/>
+    </Design.DataContext>
+
+    <UserControl.Styles>
+        <Style Selector="TextBlock.Output">
+            <Setter Property="FontFamily" Value="Cascadia Code, Consolas, Menlo, monospace" />
+            <Setter Property="FontSize" Value="13" />
+        </Style>
+        <Style Selector="TextBlock.Command">
+            <Setter Property="Foreground" Value="#4FC3F7" />
+        </Style>
+        <Style Selector="TextBlock.Error">
+            <Setter Property="Foreground" Value="#EF5350" />
+        </Style>
+        <Style Selector="TextBlock.System">
+            <Setter Property="Foreground" Value="#81C784" />
+        </Style>
+    </UserControl.Styles>
+
+    <Grid RowDefinitions="*,Auto" Background="#1E1E1E">
+
+        <!-- Output Area -->
+        <ListBox Grid.Row="0"
+                 ItemsSource="{Binding OutputLines}"
+                 Background="Transparent"
+                 BorderThickness="0"
+                 Padding="8,4">
+            <ListBox.ItemTemplate>
+                <DataTemplate x:DataType="vm:ShellOutputLine">
+                    <TextBlock Classes.Output="True"
+                               Classes.Command="{Binding Type, Converter={x:Static cnv:ShellOutputTypeConverters.ToCommandClass}}"
+                               Text="{Binding Text}"
+                               TextWrapping="Wrap" />
+                </DataTemplate>
+            </ListBox.ItemTemplate>
+        </ListBox>
+
+        <!-- Input Area -->
+        <Border Grid.Row="1"
+                Padding="8,4"
+                Background="#2D2D2D"
+                BorderBrush="#3E3E3E"
+                BorderThickness="0,1,0,0">
+            <Grid ColumnDefinitions="Auto,*,Auto">
+                <!-- Prompt -->
+                <TextBlock Grid.Column="0"
+                           Text="{Binding Prompt}"
+                           FontFamily="Cascadia Code, Consolas, Menlo, monospace"
+                           FontSize="13"
+                           Foreground="#81C784"
+                           VerticalAlignment="Center"
+                           Margin="0,0,6,0" />
+
+                <!-- Command Input -->
+                <TextBox Grid.Column="1"
+                         Text="{Binding InputCommand}"
+                         FontFamily="Cascadia Code, Consolas, Menlo, monospace"
+                         FontSize="13"
+                         Background="Transparent"
+                         BorderThickness="0"
+                         Foreground="#E0E0E0"
+                         CaretBrush="#E0E0E0"
+                         IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
+
+                <!-- Send Button -->
+                <Button Grid.Column="2"
+                        Content="Send"
+                        Command="{Binding ExecuteCommandCommand}"
+                        Padding="8,2" Margin="8,0,0,0"
+                        FontSize="12"
+                        IsEnabled="{Binding IsBusy, Converter={x:Static BoolConverters.Not}}" />
+            </Grid>
+        </Border>
+
+    </Grid>
+</UserControl>

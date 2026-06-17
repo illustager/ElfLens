@@ -103,18 +103,10 @@
                           Background="Transparent"
                           HorizontalAlignment="Stretch" />
 
-            <!-- Bottom Output Panel -->
-            <Border Grid.Column="0" Grid.ColumnSpan="5"
-                    Grid.Row="2"
-                    Background="{DynamicResource SystemAltMediumLowBrush}"
-                    Padding="8">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="OUTPUT" FontSize="10"
-                               Foreground="{DynamicResource SystemBaseMediumColorBrush}" />
-                    <TextBlock Text="Command output and logs will appear here"
-                               FontSize="12" Opacity="0.6" />
-                </StackPanel>
-            </Border>
+            <!-- Bottom Output Panel — Shell -->
+            <ContentControl Grid.Column="0" Grid.ColumnSpan="5"
+                            Grid.Row="2"
+                            Content="{Binding ShellPanel}" />
 
         </Grid>
 

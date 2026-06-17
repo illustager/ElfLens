@@ -1,9 +1,16 @@
+using System;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
+using CommunityToolkit.Mvvm.Input;
+using ElfLens.Core.Models;
+using ElfLens.Core.Services;
 
 namespace ElfLens.Core.ViewModels;
 
 public partial class MainViewModel : ViewModelBase
 {
+    private readonly ISshService _sshService;
+
     [ObservableProperty]
     private bool _isConnected;
 
@@ -13,19 +20,34 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty]
     private string _connectionHost = string.Empty;
 
+    [ObservableProperty]
+    private string _targetBinary = string.Empty;
+
     public ConnectPageViewModel ConnectPage { get; }
     public WorkspaceViewModel Workspace { get; }
+    public ShellPanelViewModel ShellPanel { get; }
 
     public MainViewModel()
     {
-        ConnectPage = new ConnectPageViewModel(OnConnectionSucceeded);
+        _sshService = new SshService();
+        ConnectPage = new ConnectPageViewModel(_sshService, OnConnectionSucceeded);
+        ShellPanel = new ShellPanelViewModel(_sshService);
         Workspace = new WorkspaceViewModel();
     }
 
-    private void OnConnectionSucceeded(string host)
+    private async void OnConnectionSucceeded(SshConnectionInfo info)
     {
+        ConnectionHost = info.Host;
+        TargetBinary = info.TargetBinaryPath;
+        ConnectionStatus = $"Connecting to {info.Host}...";
         IsConnected = true;
-        ConnectionHost = host;
-        ConnectionStatus = $"Connected to {host}";
+
+        // Initialize the shell panel in the background
+        await Task.Delay(500); // Brief delay for UI to render
+        await ShellPanel.InitializeCommand.ExecuteAsync(null);
+
+        ConnectionStatus = ShellPanel.IsBusy == false
+            ? $"Connected to {info.Host}"
+            : $"Connected to {info.Host} — shell ready";
     }
 }

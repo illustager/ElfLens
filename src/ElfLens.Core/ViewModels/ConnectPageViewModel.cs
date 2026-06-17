@@ -1,13 +1,16 @@
 using System;
+using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
 using CommunityToolkit.Mvvm.Input;
 using ElfLens.Core.Models;
+using ElfLens.Core.Services;
 
 namespace ElfLens.Core.ViewModels;
 
 public partial class ConnectPageViewModel : ViewModelBase
 {
-    private readonly Action<string>? _onConnected;
+    private readonly ISshService _sshService;
+    private readonly Action<SshConnectionInfo>? _onConnected;
 
     [ObservableProperty]
     private string _host = string.Empty;
@@ -33,10 +36,14 @@ public partial class ConnectPageViewModel : ViewModelBase
     [ObservableProperty]
     private string? _errorMessage;
 
-    public ConnectPageViewModel() : this(null) { }
+    [ObservableProperty]
+    private bool _isConnecting;
 
-    public ConnectPageViewModel(Action<string>? onConnected)
+    public ConnectPageViewModel() : this(new SshService(), null) { }
+
+    public ConnectPageViewModel(ISshService sshService, Action<SshConnectionInfo>? onConnected)
     {
+        _sshService = sshService ?? throw new ArgumentNullException(nameof(sshService));
         _onConnected = onConnected;
     }
 
@@ -60,8 +67,8 @@ public partial class ConnectPageViewModel : ViewModelBase
         TargetBinaryPath = TargetBinaryPath?.Trim() ?? string.Empty,
     };
 
-    [RelayCommand]
-    private void Connect()
+    [RelayCommand(CanExecute = nameof(CanConnect))]
+    private async Task ConnectAsync()
     {
         var info = BuildConnectionInfo();
 
@@ -72,16 +79,30 @@ public partial class ConnectPageViewModel : ViewModelBase
         }
 
         ErrorMessage = null;
+        IsConnecting = true;
 
-        var authInfo = info.AuthMethod == AuthMethod.Password
-            ? $"password (length={info.Password?.Length ?? 0})"
-            : $"key file: {info.KeyFilePath}";
+        try
+        {
+            var connected = await _sshService.ConnectAsync(info);
 
-        System.Diagnostics.Debug.WriteLine(
-            $"[ElfLens] Connecting to {info.Username}@{info.Host}:{info.Port} using {authInfo}");
-        System.Diagnostics.Debug.WriteLine(
-            $"[ElfLens] Target binary: {info.TargetBinaryPath}");
-
-        _onConnected?.Invoke(info.Host);
+            if (connected)
+            {
+                _onConnected?.Invoke(info);
+            }
+            else
+            {
+                ErrorMessage = "Failed to connect. Check host, credentials, and network.";
+            }
+        }
+        catch (Exception ex)
+        {
+            ErrorMessage = $"Connection error: {ex.Message}";
+        }
+        finally
+        {
+            IsConnecting = false;
+        }
     }
+
+    private bool CanConnect() => !IsConnecting;
 }
