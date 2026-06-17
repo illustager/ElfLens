@@ -18,27 +18,30 @@ public partial class ShellSession : IDisposable
     private readonly SemaphoreSlim _writeLock = new(1, 1);
     private const int ReadTimeoutMs = 10_000;
 
-    /// <summary>The shell's actual prompt, captured on init.</summary>
     public string Prompt { get; private set; } = "$ ";
 
     internal ShellSession(ShellStream shellStream)
     {
-        _shellStream = shellStream ?? throw new ArgumentNullException(nameof(shellStream));
+        _shellStream = shellStream;
         _writer = new StreamWriter(_shellStream) { AutoFlush = true };
-
-        // Drain MOTD, then force a prompt and capture it
         Thread.Sleep(800);
         Drain();
         _writer.WriteLine();
         Thread.Sleep(400);
-        var promptRaw = ReadAvailable();
-        if (promptRaw.Length > 0)
+        CapturePrompt();
+    }
+
+    private void CapturePrompt()
+    {
+        var raw = ReadAvailable();
+        if (raw.Length == 0) return;
+        var cleaned = AnsiRegex().Replace(raw, "");
+        cleaned = cleaned.Replace("\r\n", "\n").Replace('\r', '\n').Trim();
+        var lines = cleaned.Split('\n');
+        for (int i = lines.Length - 1; i >= 0; i--)
         {
-            var cleaned = AnsiRegex().Replace(promptRaw, "");
-            cleaned = cleaned.Replace("\r\n", "\n").Replace('\r', '\n').Trim();
-            var lastLine = cleaned.Split('\n')[^1].TrimEnd();
-            if (lastLine.Length > 0)
-                Prompt = lastLine;
+            var t = lines[i].Trim();
+            if (t.Length > 0) { Prompt = t; break; }
         }
     }
 
@@ -49,135 +52,131 @@ public partial class ShellSession : IDisposable
         {
             Drain();
             await _writer.WriteLineAsync(command.AsMemory(), ct);
-            var rawOutput = await ReadOutputAsync(ct);
+            var raw = await ReadOutputAsync(ct);
             Drain();
-            DebugLog(command, rawOutput);
-            return CleanOutput(rawOutput);
+            DebugLog("RAW", raw);
+            var result = Clean(raw);
+            DebugLog("CLEAN", result);
+            return result;
         }
-        finally
-        {
-            _writeLock.Release();
-        }
+        finally { _writeLock.Release(); }
     }
+
+    // ---- raw I/O ----
 
     private string ReadAvailable()
     {
         var sb = new StringBuilder();
-        var buffer = new byte[4096];
-        try
+        var buf = new byte[4096];
+        var sw = Environment.TickCount;
+        while (Environment.TickCount - sw < 2000)
         {
-            var start = Environment.TickCount;
-            while (Environment.TickCount - start < 2000)
+            bool got = false;
+            while (_shellStream.DataAvailable)
             {
-                bool got = false;
-                while (_shellStream.DataAvailable)
-                {
-                    int n = _shellStream.Read(buffer, 0, buffer.Length);
-                    if (n > 0) { sb.Append(Encoding.UTF8.GetString(buffer, 0, n)); got = true; }
-                    else break;
-                }
-                if (!got && sb.Length > 0) break;
-                Thread.Sleep(50);
+                int n = _shellStream.Read(buf, 0, buf.Length);
+                if (n > 0) { sb.Append(Encoding.UTF8.GetString(buf, 0, n)); got = true; }
+                else break;
             }
+            if (!got && sb.Length > 0) break;
+            Thread.Sleep(50);
         }
-        catch { }
         return sb.ToString();
     }
 
     private void Drain()
     {
-        try
+        var buf = new byte[4096];
+        var sw = Environment.TickCount;
+        while (Environment.TickCount - sw < 1500)
         {
-            var buffer = new byte[4096];
-            var start = Environment.TickCount;
-            while (Environment.TickCount - start < 1500)
-            {
-                while (_shellStream.DataAvailable)
-                    _shellStream.Read(buffer, 0, buffer.Length);
-                Thread.Sleep(50);
-            }
+            while (_shellStream.DataAvailable)
+                _shellStream.Read(buf, 0, buf.Length);
+            Thread.Sleep(50);
         }
-        catch { }
     }
 
     private async Task<string> ReadOutputAsync(CancellationToken ct)
     {
         var sb = new StringBuilder();
-        var buffer = new byte[4096];
+        var buf = new byte[4096];
         using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
         cts.CancelAfter(ReadTimeoutMs);
-        int idleLoops = 0;
-        const int maxIdle = 8;
-
-        try
+        int idle = 0;
+        while (!cts.IsCancellationRequested)
         {
-            while (!cts.IsCancellationRequested)
+            bool got = false;
+            while (_shellStream.DataAvailable)
             {
-                bool gotData = false;
-                while (_shellStream.DataAvailable)
-                {
-                    int bytesRead = _shellStream.Read(buffer, 0, buffer.Length);
-                    if (bytesRead > 0) { sb.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead)); gotData = true; }
-                    else break;
-                }
-                if (gotData) idleLoops = 0;
-                else { idleLoops++; if (idleLoops >= maxIdle && sb.Length > 0) break; }
-                await Task.Delay(40, cts.Token);
+                int n = _shellStream.Read(buf, 0, buf.Length);
+                if (n > 0) { sb.Append(Encoding.UTF8.GetString(buf, 0, n)); got = true; }
+                else break;
             }
+            if (got) idle = 0; else { idle++; if (idle >= 8 && sb.Length > 0) break; }
+            await Task.Delay(40, cts.Token);
         }
-        catch (OperationCanceledException) { }
         return sb.ToString();
     }
 
-    private string CleanOutput(string rawOutput)
-    {
-        if (string.IsNullOrEmpty(rawOutput)) return "(no output)";
+    // ---- output cleaning ----
 
-        var text = AnsiRegex().Replace(rawOutput, "");
+    /// <summary>
+    /// Strips ANSI, normalizes newlines, and deduplicates the trailing
+    /// double-prompt that shells emit with bracketed-paste mode.
+    /// Keeps the LAST prompt occurrence (no trailing newline) so the next
+    /// command's echo naturally lands on the same line.
+    /// </summary>
+    private string Clean(string raw)
+    {
+        if (string.IsNullOrEmpty(raw)) return "(no output)";
+
+        var text = AnsiRegex().Replace(raw, "");
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
 
-        var lines = text.Split('\n');
-        var result = new List<string>();
-        string? prev = null;
-        int pending = 0;
-
-        foreach (var line in lines)
+        var lines = new List<string>();
+        foreach (var line in text.Split('\n'))
         {
             var isBlank = line.Trim().Length == 0;
 
             if (isBlank)
             {
-                // If next non-blank matches prev, skip this blank + next
-                pending++;
+                // collapse consecutive blanks
+                if (lines.Count > 0 && lines[^1] != "")
+                    lines.Add("");
                 continue;
             }
 
-            if (line == prev)
+            // If the new line is identical to the last non-blank line,
+            // REPLACE the old one — keep the last copy (no trailing \r\n in raw)
+            if (lines.Count > 0)
             {
-                pending = 0;
-                continue;
+                int prevIdx = lines.Count - 1;
+                while (prevIdx >= 0 && lines[prevIdx] == "")
+                    prevIdx--;
+                if (prevIdx >= 0 && lines[prevIdx] == line)
+                {
+                    // Remove old copy and any trailing blank it had after it
+                    lines.RemoveAt(prevIdx);
+                    // Also remove trailing blanks that were after the old copy
+                    while (lines.Count > 0 && lines[^1] == "")
+                        lines.RemoveAt(lines.Count - 1);
+                    // Fall through to add the new copy
+                }
             }
 
-            // Flush at most one blank
-            if (pending > 0 && result.Count > 0)
-                result.Add("");
-            pending = 0;
-
-            prev = line;
-            result.Add(line);
+            lines.Add(line);
         }
 
-        // Remove trailing blanks only
-        while (result.Count > 0 && result[^1].Length == 0)
-            result.RemoveAt(result.Count - 1);
+        // Remove trailing blanks
+        while (lines.Count > 0 && lines[^1] == "")
+            lines.RemoveAt(lines.Count - 1);
 
         var sb = new StringBuilder();
-        foreach (var line in result)
+        foreach (var line in lines)
             sb.AppendLine(line);
 
-        var final = sb.ToString().TrimEnd('\n');
-        DebugLog("CLEAN", final);
-        return final.Length > 0 ? final : "(no output)";
+        var result = sb.ToString().TrimEnd('\n');
+        return result.Length > 0 ? result : "(no output)";
     }
 
     [GeneratedRegex(
