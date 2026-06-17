@@ -101,9 +101,8 @@
                                               Margin="16,0,4,4" x:CompileBindings="False">
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:HighlightedLine">
-                                            <Border Background="{Binding IsCurrent, Converter={x:Static cnv:HighlightConverters.CurrentBg}}"
-                                                    CornerRadius="0" Margin="0,0,0,0">
-                                                <ItemsControl ItemsSource="{Binding Tokens}" x:CompileBindings="False">
+                                            <ItemsControl ItemsSource="{Binding Tokens}" x:CompileBindings="False"
+                                                          Background="{Binding IsCurrent, Converter={x:Static cnv:HighlightConverters.CurrentBg}}">
                                                     <ItemsControl.ItemsPanel>
                                                         <ItemsPanelTemplate>
                                                             <StackPanel Orientation="Horizontal" />
@@ -125,7 +124,6 @@
                                                         </DataTemplate>
                                                     </ItemsControl.ItemTemplate>
                                                 </ItemsControl>
-                                            </Border>
                                         </DataTemplate>
                                     </ItemsControl.ItemTemplate>
                                 </ItemsControl>
