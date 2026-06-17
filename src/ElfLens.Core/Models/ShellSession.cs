@@ -21,12 +21,12 @@ public partial class ShellSession : IDisposable
     public event Action<string>? OnOutput;
     public event Action? OnDisconnected;
 
-    internal ShellSession(ShellStream shellStream)
+    internal ShellSession(ShellStream shellStream, Func<bool>? isConnected = null)
     {
         _shellStream = shellStream;
         _writer = new StreamWriter(_shellStream) { AutoFlush = true };
         _readCts = new CancellationTokenSource();
-        _ = Task.Run(() => ReadLoopAsync(_readCts.Token));
+        _ = Task.Run(() => ReadLoopAsync(_readCts.Token, isConnected));
     }
 
     public async Task SendCommandAsync(string command)
@@ -44,10 +44,9 @@ public partial class ShellSession : IDisposable
         finally { _writeLock.Release(); }
     }
 
-    private async Task ReadLoopAsync(CancellationToken ct)
+    private async Task ReadLoopAsync(CancellationToken ct, Func<bool>? isConnected)
     {
         var buf = new byte[4096];
-        int idle = 0;
         try
         {
             while (!ct.IsCancellationRequested)
@@ -56,7 +55,6 @@ public partial class ShellSession : IDisposable
                 {
                     if (_shellStream.DataAvailable)
                     {
-                        idle = 0;
                         int n = _shellStream.Read(buf, 0, buf.Length);
                         if (n > 0)
                         {
@@ -69,8 +67,8 @@ public partial class ShellSession : IDisposable
                     }
                     else
                     {
-                        idle++;
-                        if (idle > 300) break; // ~9s idle → dead connection
+                        // Check if underlying SSH connection is still alive
+                        if (isConnected?.Invoke() == false) break;
                         await Task.Delay(30, ct);
                     }
                 }
