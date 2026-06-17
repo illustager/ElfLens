@@ -61,6 +61,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
     public ObservableCollection<FunctionItem> FunctionBlocks { get; } = new();
     public event Action<ShellSession?, string>? SessionChanged;
     public event Action<FunctionItem>? ScrollToBlock;
+    public event Action? BlocksChanged; // fired when new function added
 
     /// <summary>Mark instruction lines matching (func, offset) breakpoints.</summary>
     public void MarkBreakpoints(List<(string func, int offset)> bps)
@@ -192,6 +193,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 {
                     block.IsExpanded = true;
                     FunctionBlocks.Add(block);
+                    BlocksChanged?.Invoke();
                 }
             }
 

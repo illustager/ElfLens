@@ -50,12 +50,14 @@ public partial class MainViewModel : ViewModelBase
         CenterPanels.Add(GdbDisasmPanel);
 
         // Notify breakpoints changed → update marks on both panels
-        BreakpointPanel.OnChanged(() =>
+        void ReMark()
         {
             var bps = BreakpointPanel.GetFuncBreakpoints();
             DisassemblyPanel.MarkBreakpoints(bps);
             GdbDisasmPanel.MarkBreakpoints(bps);
-        });
+        }
+        BreakpointPanel.OnChanged(ReMark);
+        GdbDisasmPanel.BlocksChanged += ReMark;
 
         GdbDisasmPanel.SessionChanged += (session, title) =>
         {
