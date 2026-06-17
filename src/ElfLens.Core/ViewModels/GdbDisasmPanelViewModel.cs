@@ -170,8 +170,8 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 done.TrySetResult(true);
         }
         _session.OnOutput += H;
-        await _session.SendCommandAsync(cmd);
         collecting = true;
+        await _session.SendCommandAsync(cmd);
         await Task.WhenAny(done.Task, Task.Delay(500));
         _session.OnOutput -= H;
         return string.Join("", sb);
