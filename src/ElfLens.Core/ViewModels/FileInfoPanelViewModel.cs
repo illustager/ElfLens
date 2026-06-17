@@ -42,7 +42,7 @@ public partial class FileInfoPanelViewModel : PanelViewModel
             var headerOut = await _sshService.ExecuteCommandAsync($"readelf -h \"{TargetPath}\"");
             ParseElfHeader(headerOut);
 
-            var sectionsOut = await _sshService.ExecuteCommandAsync($"readelf -S \"{TargetPath}\"");
+            var sectionsOut = await _sshService.ExecuteCommandAsync($"readelf -SW \"{TargetPath}\"");
             ParseSections(sectionsOut);
         }
         catch (Exception ex) { FileType = $"Error: {ex.Message}"; }
@@ -68,6 +68,7 @@ public partial class FileInfoPanelViewModel : PanelViewModel
         // Format: "  [ 0]  .interp  PROGBITS  0000000000000318  ..."
         foreach (var line in output.Split('\n'))
         {
+            // readelf -SW format: [Nr] Name Type Address Off Size ES Flg Lk Inf Al
             var m = Regex.Match(line, @"^\s*\[\s*\d+\]\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)$");
             if (m.Success)
             {
