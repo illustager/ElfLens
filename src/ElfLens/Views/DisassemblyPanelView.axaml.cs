@@ -1,5 +1,6 @@
 using System;
 using Avalonia.Controls;
+using Avalonia.Threading;
 
 namespace ElfLens.Views;
 
@@ -18,9 +19,9 @@ public partial class DisassemblyPanelView : UserControl
             vm.PropertyChanged += (s, e) =>
             {
                 if (e.PropertyName == nameof(vm.OutputText))
-                    Editor.Text = vm.OutputText;
+                    Dispatcher.UIThread.Post(() => Editor.Text = vm.OutputText);
             };
-            Editor.Text = vm.OutputText;
+            Dispatcher.UIThread.Post(() => Editor.Text = vm.OutputText);
         }
     }
 }
