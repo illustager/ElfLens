@@ -109,34 +109,37 @@ public partial class ShellSession : IDisposable
         if (string.IsNullOrEmpty(rawOutput))
             return "(no output)";
 
-        // Strip ANSI
         var text = AnsiRegex().Replace(rawOutput, "");
-
-        // Normalize: CRLF → LF, then CR → LF
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
 
-        // Collapse 3+ consecutive blank lines to at most 1
         var lines = text.Split('\n');
         var sb = new StringBuilder();
-        int blankRun = 0;
+        string? prevNonBlank = null;
 
-        for (int i = 0; i < lines.Length; i++)
+        foreach (var line in lines)
         {
-            bool isBlank = lines[i].Trim().Length == 0;
+            bool isBlank = line.Trim().Length == 0;
 
             if (isBlank)
             {
-                blankRun++;
-                if (blankRun == 1 && i > 0) sb.AppendLine();
+                // Keep at most one blank line between content
+                if (sb.Length > 0 && !sb.ToString().EndsWith("\n\n"))
+                    sb.AppendLine();
+                continue;
             }
-            else
-            {
-                blankRun = 0;
-                sb.AppendLine(lines[i]);
-            }
+
+            // Skip duplicate consecutive non-blank lines (eliminates doubled prompts)
+            if (line == prevNonBlank)
+                continue;
+
+            prevNonBlank = line;
+            sb.AppendLine(line);
         }
 
-        return sb.ToString().TrimEnd();
+        // Trim trailing newlines only, preserving prompt space
+        var result = sb.ToString();
+        result = result.TrimEnd('\n');
+        return result.Length > 0 ? result : "(no output)";
     }
 
     [GeneratedRegex(
