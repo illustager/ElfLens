@@ -9,8 +9,7 @@ using ElfLens.Core.Services;
 
 namespace ElfLens.Core.ViewModels;
 
-public enum LineType { Function, Instruction, Branch, Call, Ret, Other }
-public record HighlightedLine(LineType Type, string Text);
+public record HighlightedLine(List<Token> Tokens);
 
 public partial class FunctionItem : ObservableObject
 {
@@ -57,7 +56,7 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
         catch (Exception ex)
         {
             Functions.Add(new FunctionItem("Error", "", new List<HighlightedLine>
-                { new(LineType.Other, ex.Message) }));
+                { new(new List<Token> { new(ex.Message, "#EF5350") }) }));
         }
         finally { IsBusy = false; }
     }
@@ -80,23 +79,9 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
                 continue;
             }
             if (cur != null)
-                insts.Add(new HighlightedLine(Classify(line), line));
+                insts.Add(new HighlightedLine(DisassemblyHighlighter.Tokenize(line)));
         }
         if (cur != null) { cur.Instructions = insts; Functions.Add(cur); }
         FunctionCount = $"{Functions.Count} functions";
-    }
-
-    private static LineType Classify(string line)
-    {
-        if (Regex.IsMatch(line, @"^[0-9a-f]+\s+<[^>]+>:$")) return LineType.Function;
-        var m = Regex.Match(line, @"^\s*(?:[0-9a-f]+:\s+)?(?:[0-9a-f]{2}\s+)*([a-z]+)\b", RegexOptions.IgnoreCase);
-        if (!m.Success) return LineType.Other;
-        return m.Groups[1].Value.ToLower() switch
-        {
-            "call" => LineType.Call,
-            "ret" or "retn" or "retf" or "iret" or "iretq" => LineType.Ret,
-            var s when s.StartsWith('j') || s is "loop" or "loope" or "loopne" => LineType.Branch,
-            _ => LineType.Instruction
-        };
     }
 }
