@@ -1,5 +1,4 @@
 using System;
-using System.IO;
 using System.Threading.Tasks;
 using ElfLens.Core.Models;
 using Renci.SshNet;
@@ -39,28 +38,19 @@ public class SshService : ISshService, IDisposable
         }
     }
 
-    public async Task<ShellSession?> CreateShellSessionAsync()
+    public Task<ShellSession?> CreateShellSessionAsync()
     {
         if (_client is not { IsConnected: true })
-            return null;
+            return Task.FromResult<ShellSession?>(null);
 
         try
         {
-            var shellStream = await Task.Run(() =>
-                _client.CreateShellStream(
-                    terminalName: "xterm",
-                    columns: 160,
-                    rows: 40,
-                    width: 800,
-                    height: 600,
-                    bufferSize: 65536));
-
-            return new ShellSession(shellStream);
+            return Task.FromResult<ShellSession?>(new ShellSession(_client));
         }
         catch (Exception ex)
         {
-            System.Diagnostics.Debug.WriteLine($"[ElfLens] Failed to create shell: {ex.Message}");
-            return null;
+            System.Diagnostics.Debug.WriteLine($"[ElfLens] Failed to create shell session: {ex.Message}");
+            return Task.FromResult<ShellSession?>(null);
         }
     }
 
