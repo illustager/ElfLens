@@ -27,9 +27,9 @@ public static class DisassemblyHighlighter
 
     private static readonly Regex FuncRx =
         new(@"^([0-9a-f]+)\s+<([^>]+)>:$", RegexOptions.Compiled);
-    // [address] [bytes] [space] [prefix?] [mnemonic] [space] [rest] [;comment?]
+    // [addr] [bytes] [spc] [prefix?] [spc?] [mnemonic] [spc] [rest] [;comment?]
     private static readonly Regex InstRx = new(
-        @"^(\s*[0-9a-f]+:\s+)?((?:[0-9a-f]{2}\s)+)(\s+)(?:([a-z]\w*)\s+)?([a-z]\w*)(\s*)(.*?)?(\s*;.*)?$",
+        @"^(\s*[0-9a-f]+:\s+)?((?:[0-9a-f]{2}\s)+)(\s+)(?:([a-z]\w*)(\s+))?([a-z]\w*)(\s*)(.*?)?(\s*;.*)?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex RegRx = new(
         @"%(?:[re]?[abcd]x|[re]?[sd]i|[re]?[sb]p|[re]?ip|[re]?[a-d][lh]|[re]?s[ip]l|[re]?bpl|[re]?dil|[cr]r[0-9]|dr[0-7]|st\(?[0-7]\)?|[xyz]?mm[0-9]|xmm1[0-5]|[xy]mm1[0-5])",
@@ -63,23 +63,17 @@ public static class DisassemblyHighlighter
         var im = InstRx.Match(line);
         if (im.Success)
         {
-            // 1=addr, 2=bytes, 3=space, 4=prefix?, 5=mnemonic, 6=space, 7=rest, 8=comment?
-            if (im.Groups[1].Success)
-                t.Add(new Token(im.Groups[1].Value, CAddr));
-            if (im.Groups[2].Success)
-                t.Add(new Token(im.Groups[2].Value, CBytes));
-            if (im.Groups[3].Success)
-                t.Add(new Token(im.Groups[3].Value, CDef));
-            if (im.Groups[4].Success)
-                t.Add(new Token(im.Groups[4].Value, CDef));
-            var mnem = im.Groups[5].Value.ToLower();
-            t.Add(new Token(im.Groups[5].Value, MnemColor(mnem)));
-            if (im.Groups[6].Success)
-                t.Add(new Token(im.Groups[6].Value, CDef));
-            if (im.Groups[7].Success)
-                TokenizeOps(im.Groups[7].Value, t);
-            if (im.Groups[8].Success)
-                t.Add(new Token(im.Groups[8].Value, CComment));
+            // 1=addr,2=bytes,3=spc,4=prefix?,5=spc?,6=mnemonic,7=spc,8=rest,9=comment?
+            if (im.Groups[1].Success) t.Add(new Token(im.Groups[1].Value, CAddr));
+            if (im.Groups[2].Success) t.Add(new Token(im.Groups[2].Value, CBytes));
+            if (im.Groups[3].Success) t.Add(new Token(im.Groups[3].Value, CDef));
+            if (im.Groups[4].Success) t.Add(new Token(im.Groups[4].Value, CDef));
+            if (im.Groups[5].Success) t.Add(new Token(im.Groups[5].Value, CDef));
+            var mnem = im.Groups[6].Value.ToLower();
+            t.Add(new Token(im.Groups[6].Value, MnemColor(mnem)));
+            if (im.Groups[7].Success) t.Add(new Token(im.Groups[7].Value, CDef));
+            if (im.Groups[8].Success) TokenizeOps(im.Groups[8].Value, t);
+            if (im.Groups[9].Success) t.Add(new Token(im.Groups[9].Value, CComment));
         }
         else
         {
