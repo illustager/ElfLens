@@ -138,7 +138,16 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
             {
                 CurrentFunction = "(exited)";
                 CurrentPc = "";
-                foreach (var fb in FunctionBlocks) fb.IsExpanded = false;
+                // Clear all highlights and fold
+                for (int bi = 0; bi < FunctionBlocks.Count; bi++)
+                {
+                    var fb = FunctionBlocks[bi];
+                    fb.IsExpanded = false;
+                    var newInsts = fb.Instructions
+                        .Select(inst => new HighlightedLine(inst.Tokens, false))
+                        .ToList();
+                    FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
+                }
                 return;
             }
 
