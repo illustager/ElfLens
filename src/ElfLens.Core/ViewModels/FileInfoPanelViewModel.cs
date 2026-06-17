@@ -74,7 +74,7 @@ public partial class FileInfoPanelViewModel : PanelViewModel
         foreach (var line in output.Split('\n'))
         {
             var m = Regex.Match(line, @"^\s*\[\s*\d+\]\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)$");
-            if (m.Success)
+            if (m.Success && m.Groups[1].Value.Length > 0) // skip NULL section with empty name
             {
                 Sections.Add(new SectionItem(
                     m.Groups[1].Value, m.Groups[2].Value, m.Groups[3].Value,
