@@ -53,7 +53,7 @@ public partial class ShellSession : IDisposable
                     {
                         var raw = Encoding.UTF8.GetString(buf, 0, n);
                         raw = AnsiRegex().Replace(raw, "");
-                        raw = raw.Replace("\r\n", "\n").Replace('\r', '\n');
+                        raw = raw.Replace("\r\n", "\n").Replace("\r", "");
                         if (raw.Length > 0)
                             OnOutput?.Invoke(raw);
                     }
