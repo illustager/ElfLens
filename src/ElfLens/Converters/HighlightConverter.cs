@@ -18,11 +18,15 @@ public static class HighlightConverters
 
     private class HexToBrushConverter : IValueConverter
     {
+        private static readonly Dictionary<string, SolidColorBrush> Cache = new();
         public object? Convert(object? value, Type t, object? p, CultureInfo c)
         {
-            if (value is string hex && hex.Length > 0)
-                return new SolidColorBrush(Color.Parse(hex));
-            return new SolidColorBrush(Color.Parse("#B0BEC5"));
+            if (value is not string hex || hex.Length == 0) hex = "#B0BEC5";
+            if (Cache.TryGetValue(hex, out var b)) return b;
+            try { b = new SolidColorBrush(Color.Parse(hex)); }
+            catch { b = new SolidColorBrush(Colors.White); }
+            Cache[hex] = b;
+            return b;
         }
         public object? ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
     }

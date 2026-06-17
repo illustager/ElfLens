@@ -79,7 +79,7 @@
                                                         <TextBlock Text="{Binding Text}"
                                                                    FontSize="12"
                                                                    FontFamily="Cascadia Code, Consolas, Menlo, monospace"
-                                                                   Foreground="#FF0000" />
+                                                                   Foreground="{Binding Color, Converter={x:Static cnv:HighlightConverters.HexToBrush}}" />
                                                     </DataTemplate>
                                                 </ItemsControl.ItemTemplate>
                                             </ItemsControl>
