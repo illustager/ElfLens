@@ -21,11 +21,7 @@ public partial class ShellSession : IDisposable
     {
         _shellStream = shellStream ?? throw new ArgumentNullException(nameof(shellStream));
         _writer = new StreamWriter(_shellStream) { AutoFlush = true };
-
-        Thread.Sleep(800);
-        Drain();
-        _writer.WriteLine("stty -echo 2>/dev/null; export PS1='$ '");
-        Thread.Sleep(300);
+        Thread.Sleep(500);
         Drain();
     }
 
@@ -35,11 +31,11 @@ public partial class ShellSession : IDisposable
         {
             var buffer = new byte[4096];
             var start = Environment.TickCount;
-            while (Environment.TickCount - start < 1200)
+            while (Environment.TickCount - start < 1500)
             {
                 while (_shellStream.DataAvailable)
                     _shellStream.Read(buffer, 0, buffer.Length);
-                Thread.Sleep(60);
+                Thread.Sleep(50);
             }
         }
         catch { }
@@ -53,6 +49,9 @@ public partial class ShellSession : IDisposable
             Drain();
             await _writer.WriteLineAsync(command.AsMemory(), ct);
             var rawOutput = await ReadOutputAsync(ct);
+            // Consume any late prompt remnants so they don't bleed into next output
+            Drain();
+            DebugLog(command, rawOutput);
             return CleanOutput(rawOutput);
         }
         finally
@@ -70,7 +69,7 @@ public partial class ShellSession : IDisposable
         cts.CancelAfter(ReadTimeoutMs);
 
         int idleLoops = 0;
-        const int maxIdle = 6;
+        const int maxIdle = 8;
 
         try
         {
@@ -93,7 +92,7 @@ public partial class ShellSession : IDisposable
                     idleLoops++;
                     if (idleLoops >= maxIdle && sb.Length > 0) break;
                 }
-                await Task.Delay(50, cts.Token);
+                await Task.Delay(40, cts.Token);
             }
         }
         catch (OperationCanceledException) { }
@@ -102,60 +101,42 @@ public partial class ShellSession : IDisposable
     }
 
     /// <summary>
-    /// Strips ANSI and the trailing prompt line.
-    /// With stty -echo there is no echoed command — output is just result + prompt.
+    /// Strips ANSI escape sequences and normalizes line endings.
+    /// Nothing else — the shell's own prompt and command echo read like a real terminal.
     /// </summary>
     private static string CleanOutput(string rawOutput)
     {
         if (string.IsNullOrEmpty(rawOutput))
             return "(no output)";
 
+        // Strip ANSI
         var text = AnsiRegex().Replace(rawOutput, "");
+
+        // Normalize: CRLF → LF, then CR → LF
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
 
+        // Collapse 3+ consecutive blank lines to at most 1
         var lines = text.Split('\n');
-        var end = lines.Length;
-
-        // Strip trailing blank lines and prompt lines
-        while (end > 0)
-        {
-            var trimmed = lines[end - 1].Trim();
-            if (trimmed.Length == 0 || IsTrailingPrompt(lines[end - 1]))
-                end--;
-            else
-                break;
-        }
-
-        // Rebuild, collapsing consecutive blank lines
         var sb = new StringBuilder();
-        var prevBlank = false;
-        for (int i = 0; i < end; i++)
+        int blankRun = 0;
+
+        for (int i = 0; i < lines.Length; i++)
         {
-            var line = lines[i];
-            var isBlank = line.Trim().Length == 0;
+            bool isBlank = lines[i].Trim().Length == 0;
 
             if (isBlank)
             {
-                if (!prevBlank && sb.Length > 0)
-                    sb.AppendLine();
-                prevBlank = true;
+                blankRun++;
+                if (blankRun == 1 && i > 0) sb.AppendLine();
             }
             else
             {
-                sb.AppendLine(line);
-                prevBlank = false;
+                blankRun = 0;
+                sb.AppendLine(lines[i]);
             }
         }
 
-        var result = sb.ToString().Trim();
-        return result.Length > 0 ? result : "(no output)";
-    }
-
-    private static bool IsTrailingPrompt(string line)
-    {
-        var trimmed = line.Trim();
-        return trimmed is "$" or "#" or "$ " or "# "
-            || trimmed.EndsWith("$ ") || trimmed.EndsWith("# ");
+        return sb.ToString().TrimEnd();
     }
 
     [GeneratedRegex(
@@ -167,6 +148,19 @@ public partial class ShellSession : IDisposable
         @"\x1b[()][0-2AB]|" +
         @"\x1b\[\?[0-9]+[hl]")]
     private static partial Regex AnsiRegex();
+
+    private static void DebugLog(string command, string rawOutput)
+    {
+        try
+        {
+            var logPath = Path.Combine(AppContext.BaseDirectory, "shell_debug.log");
+            if (File.Exists(logPath) && new FileInfo(logPath).Length > 200_000)
+                File.WriteAllText(logPath, "");
+            File.AppendAllText(logPath,
+                $"\n=== CMD: {command} ===\n{rawOutput}\n=== END ===\n");
+        }
+        catch { }
+    }
 
     public void Dispose()
     {
