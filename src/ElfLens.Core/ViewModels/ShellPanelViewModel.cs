@@ -72,6 +72,8 @@ public partial class ShellPanelViewModel : ViewModelBase
 
         _commandHistory.Add(command);
         _historyIndex = _commandHistory.Count;
+        // Prepend prompt + command (shell won't echo it due to stty -echo)
+        AppendOutput($"{Prompt}{command}\n");
         InputCommand = string.Empty;
 
         if (_session == null)

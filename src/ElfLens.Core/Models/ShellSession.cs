@@ -21,7 +21,11 @@ public partial class ShellSession : IDisposable
     {
         _shellStream = shellStream ?? throw new ArgumentNullException(nameof(shellStream));
         _writer = new StreamWriter(_shellStream) { AutoFlush = true };
-        Thread.Sleep(500);
+
+        Thread.Sleep(800);
+        Drain();
+        _writer.WriteLine("stty -echo 2>/dev/null");
+        Thread.Sleep(200);
         Drain();
     }
 
@@ -30,12 +34,12 @@ public partial class ShellSession : IDisposable
         try
         {
             var buffer = new byte[4096];
-            for (int i = 0; i < 10; i++)
+            var start = Environment.TickCount;
+            while (Environment.TickCount - start < 1200)
             {
-                if (_shellStream.DataAvailable)
-                    while (_shellStream.DataAvailable)
-                        _shellStream.Read(buffer, 0, buffer.Length);
-                Thread.Sleep(80);
+                while (_shellStream.DataAvailable)
+                    _shellStream.Read(buffer, 0, buffer.Length);
+                Thread.Sleep(60);
             }
         }
         catch { }
@@ -98,8 +102,8 @@ public partial class ShellSession : IDisposable
     }
 
     /// <summary>
-    /// Strips ANSI escape sequences only. Leaves everything else intact —
-    /// the shell's own prompt, echoed command, and output read like a real terminal.
+    /// Strips ANSI and the trailing prompt line.
+    /// With stty -echo there is no echoed command — output is just result + prompt.
     /// </summary>
     private static string CleanOutput(string rawOutput)
     {
@@ -107,15 +111,52 @@ public partial class ShellSession : IDisposable
             return "(no output)";
 
         var text = AnsiRegex().Replace(rawOutput, "");
-
-        // Normalize line endings: CRLF → LF, then CR → LF
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
 
-        // Collapse 3+ consecutive blank lines into at most 1
-        text = Regex.Unescape(Regex.Replace(
-            Regex.Escape(text), @"(\n\s*\n)\s*\n(\s*\n)*", "\n\n"));
+        // Find and remove the trailing prompt line
+        var lines = text.Split('\n');
+        var end = lines.Length;
 
-        return text.Trim();
+        // Strip trailing blank lines
+        while (end > 0 && lines[end - 1].Trim().Length == 0)
+            end--;
+
+        // Strip trailing prompt: "$ ", "# ", "user@host:~$ ", etc.
+        if (end > 0 && IsTrailingPrompt(lines[end - 1]))
+            end--;
+
+        // Also check second-to-last (bracketed paste wrapping gives two prompts)
+        while (end > 0 && lines[end - 1].Trim().Length == 0)
+            end--;
+
+        // Rebuild
+        var sb = new StringBuilder();
+        for (int i = 0; i < end; i++)
+        {
+            var trimmed = lines[i].Trim();
+            // Skip leading blank lines
+            if (sb.Length == 0 && trimmed.Length == 0) continue;
+
+            // Collapse consecutive blank lines
+            if (trimmed.Length == 0 && sb.Length > 0)
+            {
+                if (!sb.ToString().EndsWith("\n\n"))
+                    sb.AppendLine();
+                continue;
+            }
+
+            sb.AppendLine(lines[i]);
+        }
+
+        var result = sb.ToString().Trim();
+        return result.Length > 0 ? result : "(no output)";
+    }
+
+    private static bool IsTrailingPrompt(string line)
+    {
+        var trimmed = line.Trim();
+        return trimmed is "$" or "#" or "$ " or "# "
+            || trimmed.EndsWith("$ ") || trimmed.EndsWith("# ");
     }
 
     [GeneratedRegex(
