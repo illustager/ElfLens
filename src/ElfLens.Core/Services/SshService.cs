@@ -38,6 +38,30 @@ public class SshService : ISshService, IDisposable
         }
     }
 
+    public async Task<string> ExecuteCommandAsync(string command)
+    {
+        if (_client is not { IsConnected: true })
+            return "(not connected)";
+
+        try
+        {
+            return await Task.Run(() =>
+            {
+                using var cmd = _client.CreateCommand(command);
+                cmd.CommandTimeout = TimeSpan.FromSeconds(30);
+                var result = cmd.Execute();
+                var error = cmd.Error;
+                if (!string.IsNullOrEmpty(error))
+                    result = string.IsNullOrEmpty(result) ? error : result + "\n" + error;
+                return string.IsNullOrEmpty(result) ? "(no output)" : result;
+            });
+        }
+        catch (Exception ex)
+        {
+            return $"(error: {ex.Message})";
+        }
+    }
+
     public async Task<ShellSession?> CreateShellSessionAsync()
     {
         if (_client is not { IsConnected: true })

@@ -31,6 +31,12 @@ public interface ISshService
     Task<ShellSession?> CreateShellSessionAsync();
 
     /// <summary>
+    /// Runs a single non-interactive command and returns its output.
+    /// Uses an exec channel — no terminal emulation, clean results.
+    /// </summary>
+    Task<string> ExecuteCommandAsync(string command);
+
+    /// <summary>
     /// Disconnects the SSH client.
     /// </summary>
     Task DisconnectAsync();
