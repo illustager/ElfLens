@@ -91,6 +91,10 @@ public partial class ShellPanelViewModel : ViewModelBase
         try
         {
             var output = await _session.ExecuteCommandAsync(command);
+
+            // Sync prompt to match the remote shell context (e.g. $ → >>> → pwndbg>)
+            Prompt = _session.DetectedPrompt;
+
             if (!string.IsNullOrEmpty(output))
             {
                 foreach (var line in output.Split('\n'))

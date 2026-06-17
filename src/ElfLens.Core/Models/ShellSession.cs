@@ -14,53 +14,39 @@ public partial class ShellSession : IDisposable
     private readonly StreamWriter _writer;
     private readonly SemaphoreSlim _writeLock = new(1, 1);
 
-    // Avoid $, _, and other shell-special chars in the marker
-    private const string EndMarker = "EEELFENSEND999";
-    private const int ReadTimeoutMs = 30_000;
-
-    // Temporary log for debugging raw shell output
-    private static readonly string LogPath =
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile), "elflens_shell_debug.log");
+    private const int ReadTimeoutMs = 10_000;
 
     internal ShellSession(ShellStream shellStream)
     {
         _shellStream = shellStream ?? throw new ArgumentNullException(nameof(shellStream));
         _writer = new StreamWriter(_shellStream) { AutoFlush = true };
-        DrainInitialOutput();
 
-        // Turn off complex prompts — use a simple dollar sign
-        _writer.WriteLine("export PS1='$ '");
-        Thread.Sleep(200);
-        DrainRemaining();
+        Thread.Sleep(500);
+        Drain();
+        _writer.WriteLine("stty -echo 2>/dev/null; export PS1='$ '");
+        Thread.Sleep(300);
+        Drain();
     }
 
-    private void DrainInitialOutput()
+    /// <summary>
+    /// After executing a command, returns the detected prompt type (for UI display).
+    /// </summary>
+    public string DetectedPrompt { get; private set; } = "$ ";
+
+    private void Drain()
     {
         try
         {
             var buffer = new byte[4096];
-            for (int i = 0; i < 30; i++)
+            for (int i = 0; i < 20; i++)
             {
                 if (_shellStream.DataAvailable)
-                    _shellStream.Read(buffer, 0, buffer.Length);
-                else
-                    Thread.Sleep(100);
-            }
-        }
-        catch { }
-    }
-
-    private void DrainRemaining()
-    {
-        try
-        {
-            var buffer = new byte[4096];
-            for (int i = 0; i < 10; i++)
-            {
-                if (_shellStream.DataAvailable)
-                    _shellStream.Read(buffer, 0, buffer.Length);
-                else
-                    Thread.Sleep(100);
+                {
+                    int total = 0;
+                    while (_shellStream.DataAvailable && total < buffer.Length)
+                        total += _shellStream.Read(buffer, total, buffer.Length - total);
+                }
+                Thread.Sleep(50);
             }
         }
         catch { }
@@ -71,17 +57,16 @@ public partial class ShellSession : IDisposable
         await _writeLock.WaitAsync(ct);
         try
         {
-            // Append end marker — pure alphanumeric, no shell-special chars
-            var fullCommand = $"{command} ; echo {EndMarker}";
-            await _writer.WriteLineAsync(fullCommand.AsMemory(), ct);
+            Drain();
 
-            var rawOutput = await ReadUntilEndMarkerAsync(ct);
+            await _writer.WriteLineAsync(command.AsMemory(), ct);
 
-            // Write raw output to debug log
-            File.AppendAllText(LogPath,
-                $"\n=== CMD: {command} ===\n{rawOutput}\n=== END ===\n");
+            var rawOutput = await ReadOutputAsync(ct);
 
-            return CleanOutput(rawOutput);
+            // Debug log — write to working directory
+            DebugLog(command, rawOutput);
+
+            return CleanOutput(rawOutput, out var prompt);
         }
         finally
         {
@@ -89,32 +74,43 @@ public partial class ShellSession : IDisposable
         }
     }
 
-    private async Task<string> ReadUntilEndMarkerAsync(CancellationToken ct)
+    private async Task<string> ReadOutputAsync(CancellationToken ct)
     {
         var sb = new StringBuilder();
         var buffer = new byte[4096];
 
-        using var timeoutCts = CancellationTokenSource.CreateLinkedTokenSource(ct);
-        timeoutCts.CancelAfter(ReadTimeoutMs);
+        using var cts = CancellationTokenSource.CreateLinkedTokenSource(ct);
+        cts.CancelAfter(ReadTimeoutMs);
+
+        int idleLoops = 0;
+        const int maxIdle = 6;
 
         try
         {
-            while (!timeoutCts.IsCancellationRequested)
+            while (!cts.IsCancellationRequested)
             {
-                if (_shellStream.DataAvailable)
+                bool gotData = false;
+                while (_shellStream.DataAvailable)
                 {
-                    var bytesRead = _shellStream.Read(buffer, 0, buffer.Length);
+                    int bytesRead = _shellStream.Read(buffer, 0, buffer.Length);
                     if (bytesRead > 0)
                     {
                         sb.Append(Encoding.UTF8.GetString(buffer, 0, bytesRead));
-                        if (sb.ToString().Contains(EndMarker))
-                            break;
+                        gotData = true;
                     }
+                    else break;
                 }
+
+                if (gotData)
+                    idleLoops = 0;
                 else
                 {
-                    await Task.Delay(50, timeoutCts.Token);
+                    idleLoops++;
+                    if (idleLoops >= maxIdle && sb.Length > 0)
+                        break;
                 }
+
+                await Task.Delay(50, cts.Token);
             }
         }
         catch (OperationCanceledException) { }
@@ -122,67 +118,148 @@ public partial class ShellSession : IDisposable
         return sb.ToString();
     }
 
-    private static string CleanOutput(string rawOutput)
+    /// <summary>
+    /// Cleans the raw shell output:
+    /// 1. Strips all ANSI escape sequences
+    /// 2. Strips leading and trailing prompt lines
+    /// 3. Detects the current prompt type for UI display
+    /// </summary>
+    private string CleanOutput(string rawOutput, out string detectedPrompt)
     {
+        detectedPrompt = DetectedPrompt;
+
         if (string.IsNullOrEmpty(rawOutput))
             return "(no output)";
 
-        // 1. Strip ANSI sequences
+        // 1. Strip ANSI escape sequences
         var text = AnsiRegex().Replace(rawOutput, "");
 
-        // 2. Normalize line endings
+        // 2. Normalize line endings and collapse blank lines
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
+        text = CollapseBlankLines(text);
 
-        // 3. Find the end marker and cut before it
-        var markerIdx = text.IndexOf(EndMarker, StringComparison.Ordinal);
-        if (markerIdx < 0)
-        {
-            // Marker not found — return whatever we got (stripped)
-            var trimmed = text.Trim();
-            return trimmed.Length > 0 ? trimmed : "(no output)";
-        }
-
-        text = text[..markerIdx];
-
-        // 4. Remove the echoed command line and prompt artifacts
+        // 3. Split into lines and strip leading + trailing prompt lines
         var lines = text.Split('\n');
+
+        // Detect prompt from the last line
+        detectedPrompt = DetectPromptFromLine(lines);
+
+        // Find first and last non-prompt lines
+        int firstContent = 0;
+        int lastContent = lines.Length - 1;
+
+        while (firstContent <= lastContent && IsPromptLine(lines[firstContent]))
+            firstContent++;
+
+        while (lastContent >= firstContent && IsPromptLine(lines[lastContent]))
+            lastContent--;
+
+        DetectedPrompt = detectedPrompt;
+
+        if (firstContent > lastContent)
+            return "(no output)";
+
+        // 4. Build result from content lines
         var sb = new StringBuilder();
-        var foundContent = false;
-
-        foreach (var line in lines)
+        for (int i = firstContent; i <= lastContent; i++)
         {
-            var trimmed = line.Trim();
+            var line = lines[i];
 
-            // Skip the echoed command (contains our marker reference in the full command)
-            if (!foundContent && trimmed.Contains("echo") && trimmed.Contains(EndMarker))
-                continue;
+            // Also strip any inline prompt from the end of a line
+            // e.g. "some output $ " -> "some output"
+            line = StripTrailingPrompt(line);
 
-            // Skip typical prompt lines
-            if (trimmed is "$" or "#" or "")
-                continue;
-
-            // Handle line with embedded prompt at end: "some output $ "
-            if (trimmed.EndsWith("$ ") || trimmed.EndsWith("# "))
-            {
-                var promptIdx = trimmed.LastIndexOfAny(['$', '#']);
-                if (promptIdx > 0 && trimmed[promptIdx - 1] == ' ')
-                {
-                    var content = trimmed[..promptIdx].Trim();
-                    if (content.Length > 0)
-                    {
-                        foundContent = true;
-                        sb.AppendLine(content);
-                    }
-                }
-                continue;
-            }
-
-            foundContent = true;
-            sb.AppendLine(line);
+            if (line.Length > 0 || (i > firstContent && i < lastContent))
+                sb.AppendLine(line);
         }
 
         var result = sb.ToString().Trim();
         return result.Length > 0 ? result : "(no output)";
+    }
+
+    /// <summary>
+    /// Detects the current prompt from the last non-empty line.
+    /// </summary>
+    private static string DetectPromptFromLine(string[] lines)
+    {
+        for (int i = lines.Length - 1; i >= 0; i--)
+        {
+            var trimmed = lines[i].Trim();
+            if (trimmed.Length == 0) continue;
+
+            foreach (var pattern in PromptPatterns)
+            {
+                if (trimmed == pattern || trimmed.EndsWith(pattern))
+                    return pattern;
+            }
+            break;
+        }
+        return "$ ";
+    }
+
+    /// <summary>
+    /// Recognized shell/REPL prompts in order of specificity.
+    /// </summary>
+    private static readonly string[] PromptPatterns =
+    {
+        "pwndbg> ",   // GDB with pwndbg
+        "(gdb) ",     // Plain GDB
+        ">>> ",       // Python REPL
+        "... ",       // Python continuation
+        "# ",         // Root shell
+        "$ ",         // User shell (most generic, check last)
+    };
+
+    private static bool IsPromptLine(string line)
+    {
+        var trimmed = line.Trim();
+        if (trimmed.Length == 0) return false;
+
+        foreach (var pattern in PromptPatterns)
+        {
+            if (trimmed == pattern.Trim() || trimmed.EndsWith(pattern.Trim()))
+                return true;
+        }
+        return false;
+    }
+
+    private static string StripTrailingPrompt(string line)
+    {
+        foreach (var pattern in PromptPatterns)
+        {
+            var p = pattern.Trim();
+            if (line.EndsWith(p) && line.Length > p.Length)
+            {
+                // Only strip if the prompt is at the end preceded by a space
+                var idx = line.LastIndexOf(p, StringComparison.Ordinal);
+                if (idx > 0 && line[idx - 1] == ' ')
+                    return line[..(idx - 1)].TrimEnd();
+            }
+        }
+        return line;
+    }
+
+    private static string CollapseBlankLines(string text)
+    {
+        var lines = text.Split('\n');
+        var sb = new StringBuilder();
+        int consecutiveBlank = 0;
+
+        foreach (var line in lines)
+        {
+            if (line.Trim().Length == 0)
+            {
+                consecutiveBlank++;
+                if (consecutiveBlank <= 2)
+                    sb.AppendLine();
+            }
+            else
+            {
+                consecutiveBlank = 0;
+                sb.AppendLine(line);
+            }
+        }
+        return sb.ToString();
     }
 
     [GeneratedRegex(
@@ -194,6 +271,22 @@ public partial class ShellSession : IDisposable
         @"\x1b[()][0-2AB]|" +
         @"\x1b\[\?[0-9]+[hl]")]
     private static partial Regex AnsiRegex();
+
+    private static void DebugLog(string command, string rawOutput)
+    {
+        try
+        {
+            var logPath = Path.Combine(AppContext.BaseDirectory, "shell_debug.log");
+
+            // Truncate log if too large
+            if (File.Exists(logPath) && new FileInfo(logPath).Length > 100_000)
+                File.WriteAllText(logPath, "");
+
+            File.AppendAllText(logPath,
+                $"\n=== CMD: {command} ===\n{rawOutput}\n=== END ===\n");
+        }
+        catch { }
+    }
 
     public void Dispose()
     {
