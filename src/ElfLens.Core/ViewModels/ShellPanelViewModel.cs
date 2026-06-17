@@ -41,11 +41,7 @@ public partial class ShellPanelViewModel : ViewModelBase
                 AppendOutput(Prompt);
                 _session.OnOutput += chunk =>
                 {
-                    uiCtx?.Post(_ =>
-                    {
-                        AppendOutput(chunk);
-                        Prompt = _session.Prompt + " ";
-                    }, null);
+                    uiCtx?.Post(_ => AppendOutput(chunk), null);
                 };
             }
             else AppendOutput("!!! Failed to create shell session\n");
@@ -56,8 +52,8 @@ public partial class ShellPanelViewModel : ViewModelBase
     [RelayCommand]
     private async Task SendCommand()
     {
-        var command = InputCommand.Trim();
-        if (string.IsNullOrEmpty(command)) return;
+        var command = InputCommand;
+        if (command.Length == 0) return;
 
         _commandHistory.Add(command);
         _historyIndex = _commandHistory.Count;
