@@ -107,7 +107,14 @@ public partial class ShellSession : IDisposable
             return "(no output)";
 
         var text = AnsiRegex().Replace(rawOutput, "");
+
+        // Normalize line endings: CRLF → LF, then CR → LF
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
+
+        // Collapse 3+ consecutive blank lines into at most 1
+        text = Regex.Unescape(Regex.Replace(
+            Regex.Escape(text), @"(\n\s*\n)\s*\n(\s*\n)*", "\n\n"));
+
         return text.Trim();
     }
 

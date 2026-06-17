@@ -8,6 +8,11 @@ public partial class ShellPanelView : UserControl
     public ShellPanelView()
     {
         InitializeComponent();
+        OutputBox.PropertyChanged += (s, e) =>
+        {
+            if (e.Property == TextBox.TextProperty)
+                OutputBox.CaretIndex = OutputBox.Text?.Length ?? 0;
+        };
     }
 
     protected override void OnKeyDown(KeyEventArgs e)
