@@ -1,5 +1,9 @@
+using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Controls.Primitives;
 using Avalonia.Input;
+using Avalonia.Threading;
+using Avalonia.VisualTree;
 
 namespace ElfLens.Views;
 
@@ -10,7 +14,11 @@ public partial class ShellPanelView : UserControl
         InitializeComponent();
         OutputBox.TextChanged += (_, _) =>
         {
-            OutputBox.CaretIndex = int.MaxValue;
+            Dispatcher.UIThread.Post(() =>
+            {
+                var scrollViewer = OutputBox.FindDescendantOfType<ScrollViewer>();
+                scrollViewer?.ScrollToEnd();
+            }, DispatcherPriority.Background);
         };
     }
 
