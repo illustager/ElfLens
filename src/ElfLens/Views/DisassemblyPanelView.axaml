@@ -1,11 +1,11 @@
 <UserControl xmlns="https://github.com/avaloniaui"
              xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
              xmlns:vm="using:ElfLens.Core.ViewModels"
-             xmlns:cnv="using:ElfLens.Converters"
+             xmlns:ae="using:AvaloniaEdit"
              x:Class="ElfLens.Views.DisassemblyPanelView"
              x:DataType="vm:DisassemblyPanelViewModel">
 
-    <Grid RowDefinitions="Auto,Auto,*" Margin="4">
+    <Grid RowDefinitions="Auto,*" Margin="4">
         <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="8">
             <Button Content="Refresh" Command="{Binding RefreshCommand}"
                     Padding="8,2" FontSize="11"
@@ -14,53 +14,14 @@
                        VerticalAlignment="Center" Opacity="0.7" />
         </StackPanel>
 
-        <TextBlock Grid.Row="1" Text="Click a function to expand/collapse"
-                   FontSize="10" Opacity="0.4" Margin="0,4,0,6" />
-
-        <ScrollViewer Grid.Row="2">
-            <ItemsControl ItemsSource="{Binding Functions}">
-                <ItemsControl.ItemTemplate>
-                    <DataTemplate x:DataType="vm:FunctionItem">
-                        <Border Margin="0,0,0,2"
-                                Background="{DynamicResource SystemAltMediumLowBrush}"
-                                CornerRadius="3">
-                            <StackPanel>
-                                <!-- Function header -->
-                                <Button Padding="6,3"
-                                        Background="Transparent"
-                                        HorizontalAlignment="Stretch"
-                                        HorizontalContentAlignment="Left"
-                                        Command="{Binding ToggleCommand}">
-                                    <StackPanel Orientation="Horizontal" Spacing="6">
-                                        <TextBlock Text="▸" FontSize="10" Width="12"
-                                                   IsVisible="{Binding IsExpanded, Converter={x:Static BoolConverters.Not}}" />
-                                        <TextBlock Text="▾" FontSize="10" Width="12"
-                                                   IsVisible="{Binding IsExpanded}" />
-                                        <TextBlock Text="{Binding Summary}"
-                                                   FontSize="11"
-                                                   FontFamily="Cascadia Code, Consolas, monospace" />
-                                    </StackPanel>
-                                </Button>
-
-                                <!-- Instructions -->
-                                <ItemsControl ItemsSource="{Binding Instructions}"
-                                              IsVisible="{Binding IsExpanded}"
-                                              Margin="20,0,4,4" x:CompileBindings="False">
-                                    <ItemsControl.ItemTemplate>
-                                        <DataTemplate x:DataType="vm:HighlightedLine">
-                                            <TextBlock Text="{Binding Text}"
-                                                       FontSize="11"
-                                                       FontFamily="Cascadia Code, Consolas, monospace"
-                                                       Margin="0,0,0,1"
-                                                       Foreground="{Binding Type, Converter={x:Static cnv:LineTypeConverters.ToBrush}}" />
-                                        </DataTemplate>
-                                    </ItemsControl.ItemTemplate>
-                                </ItemsControl>
-                            </StackPanel>
-                        </Border>
-                    </DataTemplate>
-                </ItemsControl.ItemTemplate>
-            </ItemsControl>
-        </ScrollViewer>
+        <ae:TextEditor Grid.Row="1" x:Name="Editor"
+                       IsReadOnly="True"
+                       ShowLineNumbers="True"
+                       FontFamily="Cascadia Code, Consolas, Menlo, monospace"
+                       FontSize="12"
+                       WordWrap="False"
+                       HorizontalScrollBarVisibility="Auto"
+                       VerticalScrollBarVisibility="Auto"
+                       SyntaxHighlighting="x86 Assembly" />
     </Grid>
 </UserControl>

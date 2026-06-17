@@ -6,7 +6,10 @@
       "Bash(git add *)",
       "Bash(git commit *)",
       "Bash(timeout 5 dotnet run)",
-      "Bash(powershell *)"
+      "Bash(powershell *)",
+      "Bash(dotnet add *)",
+      "WebSearch",
+      "Bash(dotnet run *)"
     ]
   }
 }

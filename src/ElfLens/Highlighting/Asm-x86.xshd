@@ -1,0 +1,97 @@
+<?xml version="1.0"?>
+<SyntaxDefinition name="x86 Assembly" xmlns="http://icsharpcode.net/sharpdevelop/syntaxdefinition/2008">
+
+  <Color name="Comment" foreground="#6A9955" exampleText="; comment" />
+  <Color name="Register" foreground="#CE93D8" exampleText="%rax" />
+  <Color name="Mnemonic" foreground="#4FC3F7" exampleText="mov" />
+  <Color name="JumpMnemonic" foreground="#FFB74D" exampleText="jmp" />
+  <Color name="CallMnemonic" foreground="#81C784" exampleText="call" />
+  <Color name="RetMnemonic" foreground="#EF5350" exampleText="ret" />
+  <Color name="Number" foreground="#FFE082" exampleText="0x401000" />
+  <Color name="String" foreground="#CE9178" exampleText="&quot;hello&quot;" />
+  <Color name="Label" foreground="#E0E0E0" fontWeight="bold" exampleText="main:" />
+  <Color name="Directive" foreground="#90A4AE" exampleText=".section" />
+
+  <RuleSet>
+
+    <!-- Comments -->
+    <Span color="Comment">
+      <Begin>;</Begin>
+    </Span>
+    <Span color="Comment">
+      <Begin>#</Begin>
+    </Span>
+
+    <!-- Strings -->
+    <Span color="String">
+      <Begin>&quot;</Begin>
+      <End>&quot;</End>
+    </Span>
+
+    <Rule color="Number">
+      \b0x[0-9a-fA-F]+\b
+    </Rule>
+
+    <Rule color="Number">
+      \b[0-9]+\b
+    </Rule>
+
+    <!-- Registers: 64-bit -->
+    <Rule color="Register">
+      %(rax|rbx|rcx|rdx|rsi|rdi|rbp|rsp|r8|r9|r10|r11|r12|r13|r14|r15|rip)\b
+    </Rule>
+    <!-- Registers: 32-bit -->
+    <Rule color="Register">
+      %(eax|ebx|ecx|edx|esi|edi|ebp|esp|r8d|r9d|r10d|r11d|r12d|r13d|r14d|r15d)\b
+    </Rule>
+    <!-- Registers: 16-bit -->
+    <Rule color="Register">
+      %(ax|bx|cx|dx|si|di|bp|sp|r8w|r9w|r10w|r11w|r12w|r13w|r14w|r15w)\b
+    </Rule>
+    <!-- Registers: 8-bit -->
+    <Rule color="Register">
+      %(al|ah|bl|bh|cl|ch|dl|dh|sil|dil|bpl|spl|r8b|r9b|r10b|r11b|r12b|r13b|r14b|r15b)\b
+    </Rule>
+    <!-- Segment/other registers -->
+    <Rule color="Register">
+      %(cs|ds|es|fs|gs|ss|cr[0-4]|dr[0-7]|st[0-7]|mm[0-7]|xmm[0-9]|xmm1[0-5]|ymm[0-9]|ymm1[0-5])\b
+    </Rule>
+
+    <!-- Return mnemonics -->
+    <Rule color="RetMnemonic">
+      \b(ret|retn|retf|iret|iretq|sysret)\b
+    </Rule>
+
+    <!-- Jump mnemonics -->
+    <Rule color="JumpMnemonic">
+      \b(jmp|je|jne|jz|jnz|jg|jge|jl|jle|ja|jae|jb|jbe|jo|jno|js|jns|jp|jnp|jcxz|jecxz|loop|loope|loopne)\b
+    </Rule>
+
+    <!-- Call mnemonics -->
+    <Rule color="CallMnemonic">
+      \b(call|int|syscall|sysenter)\b
+    </Rule>
+
+    <!-- Other mnemonics -->
+    <Rule color="Mnemonic">
+      \b(mov|movsx|movzx|movsb|movsw|movsd|movsq|lea|push|pop|pushf|popf|xor|and|or|not|neg|add|sub|mul|imul|div|idiv|inc|dec|shl|shr|sal|sar|rol|ror|rcl|rcr|cmp|test|xchg|nop|hlt|cli|sti|in|out|ins|outs|lods|lodsw|lodsd|lodsq|stos|stosw|stosd|stosq|cmps|scas|rep|repe|repne|repz|repnz|cld|std|lahf|sahf|leave|enter|bound|bswap|cmov|set|fld|fst|fstp|fadd|fsub|fmul|fdiv|fcom|fcomp|fnstsw|fchs|fabs|ftst|fxam|fld1|fldz|fldpi|fldln2|fldlg2|fldl2e|fldl2t|fsin|fcos|fsincos|fptan|fpatan|fscale|fprem|fprem1|frndint|fxtract|fyl2x|fyl2xp1|f2xm1|fnop|fninit|fnsave|frstor|fnstcw|fldcw|fnstenv|fldenv|fnclex|fwait|lock|xadd|xchg|cmpxchg|cpuid|rdtsc|rdpmc|wrmsr|rdmsr|sysenter|sysexit|vmcall|vmlaunch|vmresume|vmxoff|vmxon|vmclear|vmptrld|vmptrst|vmread|vmwrite|invept|invvpid|invlpg|lgdt|sgdt|lidt|sidt|lldt|sldt|ltr|str|lar|lsl|verr|verw|arpl|clts|invpcid|movd|movq|movdqa|movdqu|movaps|movups|movapd|movupd|addps|addpd|subps|subpd|mulps|mulpd|divps|divpd|sqrtps|sqrtpd|maxps|maxpd|minps|minpd|andps|andpd|orps|orpd|xorps|xorpd|cvtsi2ss|cvtsi2sd|cvtss2si|cvtsd2si|cvttss2si|cvttsd2si|movss|movsd|addss|addsd|subss|subsd|mulss|mulsd|divss|divsd|sqrtss|sqrtsd|maxss|maxsd|minss|minsd|ucomiss|ucomisd|comiss|comisd|punpcklbw|punpcklwd|punpckldq|punpcklqdq|packsswb|packuswb|paddb|paddw|paddd|paddq|psubb|psubw|psubd|psubq|pmullw|pmulhw|pmulhuw|pmaddwd|pavgb|pavgw|pminub|pmaxub|pminsw|pmaxsw|pand|pandn|por|pxor|psllw|pslld|psllq|psrlw|psrld|psrlq|psraw|psrad|pcmpeqb|pcmpeqw|pcmpeqd|pcmpgtb|pcmpgtw|pcmpgtd)\b
+    </Rule>
+
+    <!-- Labels / symbols -->
+    <Rule color="Label">
+      \b[a-zA-Z_.][a-zA-Z0-9_.]*:
+    </Rule>
+
+    <!-- Function references in angle brackets -->
+    <Span color="Label">
+      <Begin>&lt;</Begin>
+      <End>&gt;</End>
+    </Span>
+
+    <!-- Directives -->
+    <Rule color="Directive">
+      ^\s*\.[a-zA-Z][a-zA-Z0-9_]*
+    </Rule>
+
+  </RuleSet>
+</SyntaxDefinition>
