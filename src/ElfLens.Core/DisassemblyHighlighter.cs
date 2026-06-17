@@ -16,6 +16,7 @@ public static class DisassemblyHighlighter
     private const string CFunc    = "#4FC3F7";
     private const string CReg     = "#CE93D8";
     private const string CHex     = "#FFE082";
+    private const string CComment = "#6A9955";
     private const string CDef     = "#B0BEC5";
 
     private static readonly HashSet<string> BranchSet = new()
@@ -26,10 +27,9 @@ public static class DisassemblyHighlighter
 
     private static readonly Regex FuncRx =
         new(@"^([0-9a-f]+)\s+<([^>]+)>:$", RegexOptions.Compiled);
-    // Split instruction line into: [address] [bytes + spaces] [mnemonic] [rest]
-    // Preserve whitespace between columns for alignment
+    // [address] [bytes] [space] [prefix?] [mnemonic] [space] [rest] [;comment?]
     private static readonly Regex InstRx = new(
-        @"^(\s*[0-9a-f]+:\s+)?((?:[0-9a-f]{2}\s)+)(\s+)([a-z]\w*)(\s*)(.*)?$",
+        @"^(\s*[0-9a-f]+:\s+)?((?:[0-9a-f]{2}\s)+)(\s+)(?:([a-z]\w*)\s+)?([a-z]\w*)(\s*)(.*?)?(\s*;.*)?$",
         RegexOptions.Compiled | RegexOptions.IgnoreCase);
     private static readonly Regex RegRx = new(
         @"%(?:[re]?[abcd]x|[re]?[sd]i|[re]?[sb]p|[re]?ip|[re]?[a-d][lh]|[re]?s[ip]l|[re]?bpl|[re]?dil|[cr]r[0-9]|dr[0-7]|st\(?[0-7]\)?|[xyz]?mm[0-9]|xmm1[0-5]|[xy]mm1[0-5])",
@@ -42,6 +42,13 @@ public static class DisassemblyHighlighter
     public static List<Token> Tokenize(string line)
     {
         var t = new List<Token>();
+
+        // Entire-line comment
+        if (line.TrimStart().StartsWith(';') || line.TrimStart().StartsWith('#'))
+        {
+            t.Add(new Token(line, CComment));
+            return t;
+        }
 
         var fh = FuncRx.Match(line);
         if (fh.Success)
@@ -56,19 +63,23 @@ public static class DisassemblyHighlighter
         var im = InstRx.Match(line);
         if (im.Success)
         {
-            // Groups: 1=address, 2=bytes, 3=space, 4=mnemonic, 5=space, 6=operands
+            // 1=addr, 2=bytes, 3=space, 4=prefix?, 5=mnemonic, 6=space, 7=rest, 8=comment?
             if (im.Groups[1].Success)
                 t.Add(new Token(im.Groups[1].Value, CAddr));
             if (im.Groups[2].Success)
                 t.Add(new Token(im.Groups[2].Value, CBytes));
             if (im.Groups[3].Success)
                 t.Add(new Token(im.Groups[3].Value, CDef));
-            var mnem = im.Groups[4].Value.ToLower();
-            t.Add(new Token(mnem, MnemColor(mnem)));
-            if (im.Groups[5].Success)
-                t.Add(new Token(im.Groups[5].Value, CDef));
+            if (im.Groups[4].Success)
+                t.Add(new Token(im.Groups[4].Value, CDef));
+            var mnem = im.Groups[5].Value.ToLower();
+            t.Add(new Token(im.Groups[5].Value, MnemColor(mnem)));
             if (im.Groups[6].Success)
-                TokenizeOps(im.Groups[6].Value, t);
+                t.Add(new Token(im.Groups[6].Value, CDef));
+            if (im.Groups[7].Success)
+                TokenizeOps(im.Groups[7].Value, t);
+            if (im.Groups[8].Success)
+                t.Add(new Token(im.Groups[8].Value, CComment));
         }
         else
         {
