@@ -208,7 +208,16 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 var body = gdbInst.Groups[3].Value;
                 // Use spaces not tabs — matches objdump format that Tokenize expects
                 var normalized = $"  {addr}:\t{body}".Replace('\t', ' ');
-                insts.Add(new HighlightedLine(DisassemblyHighlighter.Tokenize(normalized)));
+                var tokens = DisassemblyHighlighter.Tokenize(normalized);
+                // Diagnostic: log first parse to file
+                if (insts.Count == 0)
+                {
+                    try { System.IO.File.AppendAllText(
+                        System.IO.Path.Combine(System.AppContext.BaseDirectory, "gdb_parse.log"),
+                        $"NORM: {normalized}\nTOKENS: {string.Join(" | ", tokens.Select(tk => $"{tk.Text}[{tk.Color}]"))}\n\n"); }
+                    catch { }
+                }
+                insts.Add(new HighlightedLine(tokens));
             }
         }
 
