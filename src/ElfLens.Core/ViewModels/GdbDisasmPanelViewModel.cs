@@ -117,10 +117,8 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
 
             else
             {
-                // Same function — clear all then re-highlight current
                 ClearAllHighlights();
-                var block = FunctionBlocks.FirstOrDefault(f => f.Name == funcName);
-                if (block != null) HighlightInBlock(block, pcAddr);
+                HighlightCurrent(pcAddr, funcName);
             }
 
             if (_staticDisasm.HasFunction(funcName))
@@ -149,20 +147,20 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         }
     }
 
-    private void HighlightInBlock(FunctionItem block, string pcAddr)
+    private void HighlightCurrent(string pcAddr, string funcName)
     {
         for (int bi = 0; bi < FunctionBlocks.Count; bi++)
         {
-            if (FunctionBlocks[bi] != block) continue;
+            var fb = FunctionBlocks[bi];
+            if (fb.Name != funcName) continue;
             var newInsts = new List<HighlightedLine>();
-            foreach (var line in block.Instructions)
+            foreach (var line in fb.Instructions)
             {
                 var isCur = line.Tokens.Any(t =>
                     t.Text.Contains(pcAddr, StringComparison.OrdinalIgnoreCase));
-                newInsts.Add(isCur && !line.IsCurrent
-                    ? new HighlightedLine(line.Tokens, true) : line);
+                newInsts.Add(new HighlightedLine(line.Tokens, isCur));
             }
-            FunctionBlocks[bi] = new FunctionItem(block.Name, block.Address, newInsts);
+            FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
             break;
         }
     }
