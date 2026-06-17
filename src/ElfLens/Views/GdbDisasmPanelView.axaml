@@ -69,6 +69,11 @@
                                         <DataTemplate x:DataType="vm:HighlightedLine">
                                             <Border BorderBrush="{Binding IsBreakpoint, Converter={x:Static cnv:HighlightConverters.BreakpointBorder}}"
                                                     BorderThickness="3,0,0,0">
+                                                <Border.ContextMenu>
+                                                    <ContextMenu FontSize="11" FontFamily="Segoe UI, sans-serif">
+                                                        <MenuItem Header="Set Breakpoint" Click="OnSetBreakpointClick" Padding="8,3" />
+                                                    </ContextMenu>
+                                                </Border.ContextMenu>
                                             <ItemsControl ItemsSource="{Binding Tokens}" x:CompileBindings="False"
                                                           Background="{Binding IsCurrent, Converter={x:Static cnv:HighlightConverters.CurrentBg}}">
                                                 <ItemsControl.ItemsPanel>

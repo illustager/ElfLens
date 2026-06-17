@@ -47,10 +47,24 @@ public partial class BreakpointPanelViewModel : PanelViewModel
     {
         var loc = NewBreakpoint.Trim();
         if (loc.Length == 0) return;
-        Entries.Add(new BreakpointEntry { Location = loc });
+        // Auto-prefix plain function names with * (GDB address-of syntax)
+        if (!loc.StartsWith('*') && !loc.StartsWith("0x") && !char.IsDigit(loc[0]))
+            loc = "*" + loc;
+        var entry = new BreakpointEntry { Location = loc };
+        Entries.Add(entry);
         NewBreakpoint = "";
         NotifyChanged();
-        if (_session != null) _ = ApplySingleAsync(loc);
+        if (_session != null) _ = ApplySingleAsync(loc, entry);
+    }
+
+    /// <summary>Add breakpoint from disassembly panel right-click (func+offset).</summary>
+    public void AddFromDisasm(string func, int offset)
+    {
+        var loc = offset == 0 ? $"*{func}" : $"*{func}+{offset}";
+        var entry = new BreakpointEntry { Location = loc };
+        Entries.Add(entry);
+        NotifyChanged();
+        if (_session != null) _ = ApplySingleAsync(loc, entry);
     }
 
     [RelayCommand]
@@ -79,11 +93,11 @@ public partial class BreakpointPanelViewModel : PanelViewModel
     {
         if (_session == null) return;
         foreach (var e in Entries.Where(e => e.Enabled))
-            await ApplySingleAsync(e.Location);
+            await ApplySingleAsync(e.Location, e);
         await RefreshFromGdbAsync();
     }
 
-    private async Task ApplySingleAsync(string loc)
+    private async Task ApplySingleAsync(string loc, BreakpointEntry? entry = null)
     {
         if (_session == null) return;
         // Capture the break command output to get assigned number
@@ -94,6 +108,19 @@ public partial class BreakpointPanelViewModel : PanelViewModel
         await _session.SendCommandAsync($"break {loc}");
         await Task.WhenAny(done.Task, Task.Delay(800));
         _session.OnOutput -= H;
+
+        // Parse breakpoint number from output like "Breakpoint 1 at 0x401000"
+        if (entry != null)
+        {
+            var m = Regex.Match(string.Join("", output),
+                @"Breakpoint\s+(\d+)\s+at\s+(0x[0-9a-fA-F]+)(?:\s+in\s+(\S+))?");
+            if (m.Success)
+            {
+                entry.GdbNum = m.Groups[1].Value;
+                entry.ResolvedAddr = m.Groups[2].Value;
+                if (m.Groups[3].Success) entry.ResolvedFunc = m.Groups[3].Value;
+            }
+        }
     }
 
     public async Task RefreshFromGdbAsync()
@@ -146,11 +173,11 @@ public partial class BreakpointPanelViewModel : PanelViewModel
         foreach (var e in Entries.Where(e => e.Enabled))
         {
             var loc = e.Location;
-            // func+offset
-            var m = Regex.Match(loc, @"^([a-zA-Z_]\w*)\+(\d+)$");
+            // func+offset (with optional * prefix)
+            var m = Regex.Match(loc, @"^\*?([a-zA-Z_]\w*)\+(\d+)$");
             if (m.Success) { result.Add((m.Groups[1].Value, int.Parse(m.Groups[2].Value))); continue; }
-            // func only
-            var m2 = Regex.Match(loc, @"^([a-zA-Z_]\w*)$");
+            // func only (with optional * prefix)
+            var m2 = Regex.Match(loc, @"^\*?([a-zA-Z_]\w*)$");
             if (m2.Success) { result.Add((m2.Groups[1].Value, 0)); continue; }
             // *addr — skip for marking
         }

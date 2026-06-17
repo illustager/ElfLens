@@ -45,7 +45,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 newInsts.Add(new HighlightedLine(line.Tokens, isCur, line.IsBreakpoint));
             }
             if (changed)
-                FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
+                FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts) { IsExpanded = fb.IsExpanded };
         }
         if (foundName != null)
         {
@@ -62,6 +62,10 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
     public event Action<ShellSession?, string>? SessionChanged;
     public event Action<FunctionItem>? ScrollToBlock;
     public event Action? BlocksChanged; // fired when new function added
+    public event Action<string, int>? BreakpointRequested;
+
+    public void RequestBreakpoint(string func, int offset) =>
+        BreakpointRequested?.Invoke(func, offset);
 
     /// <summary>Mark instruction lines matching (func, offset) breakpoints.</summary>
     public void MarkBreakpoints(List<(string func, int offset)> bps)
@@ -69,23 +73,31 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         for (int bi = 0; bi < FunctionBlocks.Count; bi++)
         {
             var fb = FunctionBlocks[bi];
+            if (!long.TryParse(fb.Address, System.Globalization.NumberStyles.HexNumber, null, out var baseAddr))
+                continue;
             var changed = false;
             var newInsts = new List<HighlightedLine>();
-            int lineIdx = 0;
             foreach (var line in fb.Instructions)
             {
                 var isBp = false;
-                foreach (var bp in bps)
+                // Extract instruction address from first token (format: "  401000:\t")
+                var firstText = line.Tokens.FirstOrDefault()?.Text ?? "";
+                var addrM = Regex.Match(firstText, @"([0-9a-fA-F]+)");
+                if (addrM.Success && long.TryParse(addrM.Groups[1].Value,
+                    System.Globalization.NumberStyles.HexNumber, null, out var instAddr))
                 {
-                    if (fb.Name == bp.func && lineIdx == bp.offset)
-                    { isBp = true; break; }
+                    var byteOffset = (int)(instAddr - baseAddr);
+                    foreach (var bp in bps)
+                    {
+                        if (fb.Name == bp.func && byteOffset == bp.offset)
+                        { isBp = true; break; }
+                    }
                 }
                 if (isBp != line.IsBreakpoint) changed = true;
                 newInsts.Add(new HighlightedLine(line.Tokens, line.IsCurrent, isBp));
-                lineIdx++;
             }
             if (changed)
-                FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
+                FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts) { IsExpanded = fb.IsExpanded };
         }
     }
 
@@ -110,9 +122,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
             IsDebugging = true;
             SessionChanged?.Invoke(_session, "GDB");
 
-            await Task.Delay(300);
-            await _session.SendCommandAsync("break _start");
-            await Task.Delay(200);
+            await Task.Delay(500);
             await _session.SendCommandAsync("run");
             await Task.Delay(500);
             await RefreshAsync();
@@ -173,7 +183,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                     var newInsts = fb.Instructions
                         .Select(inst => new HighlightedLine(inst.Tokens, false, inst.IsBreakpoint))
                         .ToList();
-                    FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
+                    FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts) { IsExpanded = fb.IsExpanded };
                 }
                 return;
             }

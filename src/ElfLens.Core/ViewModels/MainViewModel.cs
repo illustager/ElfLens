@@ -16,6 +16,7 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private string _connectionStatus = "Disconnected";
     [ObservableProperty] private string _connectionHost = string.Empty;
     [ObservableProperty] private string _targetBinary = string.Empty;
+    [ObservableProperty] private PanelViewModel? _selectedBottomPanel;
 
     public ConnectPageViewModel ConnectPage { get; }
     public WorkspaceViewModel Workspace { get; }
@@ -59,12 +60,19 @@ public partial class MainViewModel : ViewModelBase
         BreakpointPanel.OnChanged(ReMark);
         GdbDisasmPanel.BlocksChanged += ReMark;
 
+        // Route right-click breakpoint requests from disassembly panels
+        DisassemblyPanel.BreakpointRequested += (func, offset) =>
+            BreakpointPanel.AddFromDisasm(func, offset);
+        GdbDisasmPanel.BreakpointRequested += (func, offset) =>
+            BreakpointPanel.AddFromDisasm(func, offset);
+
         GdbDisasmPanel.SessionChanged += (session, title) =>
         {
             if (session != null)
             {
                 _gdbShellPanel = new ShellPanelViewModel(session, title);
                 BottomPanels.Add(_gdbShellPanel);
+                SelectedBottomPanel = _gdbShellPanel;
                 BreakpointPanel.SetSession(session);
             }
             else

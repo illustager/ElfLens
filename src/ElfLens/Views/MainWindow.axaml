@@ -103,6 +103,7 @@
             <!-- Bottom panels -->
             <TabControl Grid.Column="0" Grid.ColumnSpan="5" Grid.Row="2"
                         ItemsSource="{Binding BottomPanels}"
+                        SelectedItem="{Binding SelectedBottomPanel}"
                         Background="{DynamicResource SystemAltMediumLowBrush}">
                 <TabControl.ItemTemplate>
                     <DataTemplate x:DataType="vm:PanelViewModel">

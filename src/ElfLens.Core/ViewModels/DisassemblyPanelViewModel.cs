@@ -39,6 +39,10 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
 
     public ObservableCollection<FunctionItem> Functions { get; } = new();
     public event Action<FunctionItem>? NavigateToFunction;
+    public event Action<string, int>? BreakpointRequested;
+
+    public void RequestBreakpoint(string func, int offset) =>
+        BreakpointRequested?.Invoke(func, offset);
 
     public DisassemblyPanelViewModel(ISshService sshService) => _sshService = sshService;
 
@@ -81,23 +85,31 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
         for (int bi = 0; bi < Functions.Count; bi++)
         {
             var fb = Functions[bi];
+            if (!long.TryParse(fb.Address, System.Globalization.NumberStyles.HexNumber, null, out var baseAddr))
+                continue;
             var changed = false;
             var newInsts = new List<HighlightedLine>();
-            int lineIdx = 0;
             foreach (var line in fb.Instructions)
             {
                 var isBp = false;
-                foreach (var bp in bps)
+                // Extract instruction address from first token (format: "  401000:\t")
+                var firstText = line.Tokens.FirstOrDefault()?.Text ?? "";
+                var addrM = Regex.Match(firstText, @"([0-9a-fA-F]+)");
+                if (addrM.Success && long.TryParse(addrM.Groups[1].Value,
+                    System.Globalization.NumberStyles.HexNumber, null, out var instAddr))
                 {
-                    if (fb.Name == bp.func && lineIdx == bp.offset)
-                    { isBp = true; break; }
+                    var byteOffset = (int)(instAddr - baseAddr);
+                    foreach (var bp in bps)
+                    {
+                        if (fb.Name == bp.func && byteOffset == bp.offset)
+                        { isBp = true; break; }
+                    }
                 }
                 if (isBp != line.IsBreakpoint) changed = true;
                 newInsts.Add(new HighlightedLine(line.Tokens, line.IsCurrent, isBp));
-                lineIdx++;
             }
             if (changed)
-                Functions[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
+                Functions[bi] = new FunctionItem(fb.Name, fb.Address, newInsts) { IsExpanded = fb.IsExpanded };
         }
     }
 
