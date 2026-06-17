@@ -51,7 +51,10 @@ public partial class FileInfoPanelViewModel : PanelViewModel
             ParseElfHeader(headerOut);
 
             var checksecOut = await _sshService.ExecuteCommandAsync($"checksec \"{TargetPath}\"");
-            ParseChecksec(checksecOut);
+            if (!string.IsNullOrWhiteSpace(checksecOut) && checksecOut.Contains("RELRO"))
+                ParseChecksec(checksecOut);
+            else
+                await ParseSecurityFallback();
 
             var sectionsOut = await _sshService.ExecuteCommandAsync($"readelf -SW \"{TargetPath}\"");
             ParseSections(sectionsOut);
@@ -104,6 +107,24 @@ public partial class FileInfoPanelViewModel : PanelViewModel
         ColAddrWidth = Math.Max(Sections.Max(s => s.Address.Length) * charWidth + padding, 80);
         ColSizeWidth = Math.Max(Sections.Max(s => s.Size.Length) * charWidth + padding, 50);
         ColFlagsWidth = Math.Max(Sections.Max(s => s.Flags.Length) * charWidth + padding, 50);
+    }
+
+    private async Task ParseSecurityFallback()
+    {
+        SecurityInfo.Clear();
+        var progOut = await _sshService.ExecuteCommandAsync($"readelf -lW \"{TargetPath}\"");
+        var symsOut = await _sshService.ExecuteCommandAsync($"readelf -sW \"{TargetPath}\"");
+
+        bool hasNx = progOut.Contains("GNU_STACK") && !Regex.IsMatch(progOut, @"GNU_STACK.*\bE\b");
+        bool hasRelro = progOut.Contains("GNU_RELRO");
+        bool hasCanary = symsOut.Contains("__stack_chk_fail");
+        SecurityInfo.Add(new SecurityItem("NX", hasNx, hasNx ? "NX enabled" : "NX disabled"));
+        SecurityInfo.Add(new SecurityItem("RELRO", hasRelro, hasRelro ? "RELRO present" : "No RELRO"));
+        SecurityInfo.Add(new SecurityItem("Stack Canary", hasCanary, hasCanary ? "Canary found" : "No canary"));
+        // PIE: check ELF type from already-parsed header
+        var typeItem = ElfHeaders.FirstOrDefault(h => h.Key == "Type");
+        bool isPie = typeItem?.Value?.Contains("DYN") == true;
+        SecurityInfo.Add(new SecurityItem("PIE", isPie, isPie ? "PIE enabled" : "No PIE"));
     }
 
     private void ParseChecksec(string output)
