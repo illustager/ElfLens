@@ -2,6 +2,7 @@ using System;
 using System.Linq;
 using Avalonia;
 using Avalonia.Controls;
+using Avalonia.Input;
 using Avalonia.Threading;
 using Avalonia.VisualTree;
 
@@ -21,7 +22,6 @@ public partial class DisassemblyPanelView : UserControl
         {
             vm.NavigateToFunction += fn =>
             {
-                // Expand first, then scroll after layout updates
                 Dispatcher.UIThread.Post(() =>
                 {
                     var border = Scroller.GetVisualDescendants()
@@ -30,6 +30,19 @@ public partial class DisassemblyPanelView : UserControl
                     border?.BringIntoView();
                 }, DispatcherPriority.Background);
             };
+        }
+    }
+
+    private void OnLineClicked(object? sender, PointerPressedEventArgs e)
+    {
+        if (sender is not Control ctrl) return;
+        // Find the HighlightedLine DataContext
+        var line = ctrl.DataContext as Core.ViewModels.HighlightedLine;
+        if (line == null) return;
+        var token = line.Tokens.FirstOrDefault(t => t.NavigateTo != null);
+        if (token?.NavigateTo != null && DataContext is Core.ViewModels.DisassemblyPanelViewModel vm)
+        {
+            vm.NavigateCommand.Execute(token.NavigateTo);
         }
     }
 }

@@ -94,7 +94,8 @@
                                     <ItemsControl.ItemTemplate>
                                         <DataTemplate x:DataType="vm:HighlightedLine">
                                             <ItemsControl ItemsSource="{Binding Tokens}" x:CompileBindings="False"
-                                                          Background="{Binding IsCurrent, Converter={x:Static cnv:HighlightConverters.CurrentBg}}">
+                                                          Background="{Binding IsCurrent, Converter={x:Static cnv:HighlightConverters.CurrentBg}}"
+                                                          PointerPressed="OnLineClicked">
                                                     <ItemsControl.ItemsPanel>
                                                         <ItemsPanelTemplate>
                                                             <StackPanel Orientation="Horizontal" />
