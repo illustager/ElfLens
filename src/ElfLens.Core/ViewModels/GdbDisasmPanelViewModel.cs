@@ -25,6 +25,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
     [ObservableProperty] private bool _isBusy;
     [ObservableProperty] private bool _isDebugging;
     [ObservableProperty] private string _currentFunction = "";
+    [ObservableProperty] private string _currentPc = "";
 
     public ObservableCollection<FunctionItem> FunctionBlocks { get; } = new();
     public event Action<ShellSession?, string>? SessionChanged;
@@ -78,6 +79,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         IsDebugging = false;
         FunctionBlocks.Clear();
         CurrentFunction = "";
+        CurrentPc = "";
         _staticDisasm.HighlightFunction(null, null);
     }
 
@@ -95,19 +97,16 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         IsBusy = true;
         try
         {
-            // Single capture for info commands to avoid cross-talk
             var all = await Capture("info registers pc");
             var pcM = Regex.Match(all, @"0x([0-9a-f]+)");
             var pcAddr = pcM.Success ? pcM.Groups[1].Value : "";
 
-            // Extract function name from <name+offset> in pc output
             var nameM = Regex.Match(all, @"<([a-zA-Z_]\w*)(?:\+\d+)?>");
-            var funcName = nameM.Success ? nameM.Groups[1].Value : "";
+            var funcName = nameM.Success ? nameM.Groups[1].Value
+                : (pcAddr.Length > 0 ? "0x" + pcAddr : "??");
             CurrentFunction = funcName;
+            CurrentPc = pcAddr;
 
-            ClearAllHighlights();
-
-            // Add new function if not already in blocks
             if (!FunctionBlocks.Any(f => f.Name == funcName))
             {
                 var asm = string.IsNullOrEmpty(pcAddr)
@@ -118,8 +117,6 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                     FunctionBlocks.Add(block);
             }
 
-            HighlightCurrent(pcAddr, funcName);
-
             if (_staticDisasm.HasFunction(funcName))
                 _staticDisasm.HighlightFunction(funcName, pcAddr);
             else
@@ -127,39 +124,6 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         }
         catch { }
         finally { IsBusy = false; }
-    }
-
-    private void ClearAllHighlights()
-    {
-        for (int bi = 0; bi < FunctionBlocks.Count; bi++)
-        {
-            var fb = FunctionBlocks[bi];
-            if (!fb.Instructions.Any(i => i.IsCurrent)) continue;
-            var newInsts = fb.Instructions
-                .Select(inst => new HighlightedLine(inst.Tokens, false))
-                .ToList();
-            FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
-        }
-    }
-
-    private void HighlightCurrent(string pcAddr, string funcName)
-    {
-        for (int bi = 0; bi < FunctionBlocks.Count; bi++)
-        {
-            var fb = FunctionBlocks[bi];
-            if (fb.Name != funcName) continue;
-            var newInsts = new List<HighlightedLine>();
-            foreach (var line in fb.Instructions)
-            {
-                // Only match the address column (first token starting with hex)
-                var firstToken = line.Tokens.FirstOrDefault();
-                var isCur = firstToken?.Text.Trim()
-                    .Contains(pcAddr, StringComparison.OrdinalIgnoreCase) == true;
-                newInsts.Add(new HighlightedLine(line.Tokens, isCur));
-            }
-            FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
-            break;
-        }
     }
 
     private async Task<string> Capture(string cmd)
@@ -214,9 +178,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 firstAddr ??= addr;
                 var body = gdbInst.Groups[3].Value;
                 var normalized = $"  {addr}:\t{body}";
-                var isCur = currentPc != null &&
-                    string.Equals(addr.TrimStart('0'), currentPc.TrimStart('0'), StringComparison.OrdinalIgnoreCase);
-                insts.Add(new HighlightedLine(DisassemblyHighlighter.Tokenize(normalized), isCur));
+                insts.Add(new HighlightedLine(DisassemblyHighlighter.Tokenize(normalized)));
             }
         }
 

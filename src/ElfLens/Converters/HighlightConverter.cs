@@ -1,5 +1,7 @@
 using System;
+using System.Collections.Generic;
 using System.Globalization;
+using System.Linq;
 using Avalonia.Data.Converters;
 using Avalonia.Input;
 using Avalonia.Media;
@@ -12,6 +14,7 @@ public static class HighlightConverters
     public static readonly IValueConverter CurrentBg = new CurrentBgConverter();
     public static readonly IValueConverter FuncHighlightBg = new FuncHighlightBgConverter();
     public static readonly IValueConverter NavCursor = new NavCursorConverter();
+    public static readonly IMultiValueConverter PcHighlight = new PcHighlightConverter();
 
     private class HexToBrushConverter : IValueConverter
     {
@@ -57,5 +60,22 @@ public static class HighlightConverters
             return Cursor.Default;
         }
         public object? ConvertBack(object? v, Type t, object? p, CultureInfo c) => throw new NotSupportedException();
+    }
+
+    private class PcHighlightConverter : IMultiValueConverter
+    {
+        private static readonly SolidColorBrush Highlight = new(Color.Parse("#3A3A00"));
+        public object? Convert(IList<object?> values, Type t, object? p, CultureInfo c)
+        {
+            if (values.Count >= 2 &&
+                values[0] is Core.ViewModels.HighlightedLine line &&
+                values[1] is string pc && pc.Length > 0)
+            {
+                var first = line.Tokens.FirstOrDefault();
+                if (first?.Text.TrimStart().Contains(pc.TrimStart('0'), StringComparison.OrdinalIgnoreCase) == true)
+                    return Highlight;
+            }
+            return Brushes.Transparent;
+        }
     }
 }
