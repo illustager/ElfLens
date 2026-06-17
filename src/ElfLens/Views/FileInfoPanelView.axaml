@@ -22,6 +22,38 @@
                 </StackPanel>
             </Border>
 
+            <!-- Security -->
+            <Border Padding="6,4" CornerRadius="4"
+                    Background="{DynamicResource SystemAltMediumLowBrush}">
+                <StackPanel Spacing="2">
+                    <ToggleButton x:Name="secuToggle" Content="SECURITY" FontSize="11"
+                                  FontWeight="Bold"
+                                  Foreground="{DynamicResource SystemBaseHighColorBrush}"
+                                  Background="Transparent" BorderThickness="0"
+                                  HorizontalAlignment="Stretch" HorizontalContentAlignment="Left"
+                                  Padding="0" Cursor="Hand" />
+                    <ItemsControl ItemsSource="{Binding SecurityInfo}"
+                                  IsVisible="{Binding #secuToggle.IsChecked}">
+                        <ItemsControl.ItemTemplate>
+                            <DataTemplate x:DataType="vm:SecurityItem">
+                                <Grid ColumnDefinitions="14,*,Auto" MinHeight="20">
+                                    <TextBlock Grid.Column="0" FontSize="13" VerticalAlignment="Center"
+                                               Text="✗" Foreground="#F44336"
+                                               IsVisible="{Binding Enabled, Converter={x:Static BoolConverters.Not}}" />
+                                    <TextBlock Grid.Column="0" FontSize="13" VerticalAlignment="Center"
+                                               Text="✓" Foreground="#4CAF50"
+                                               IsVisible="{Binding Enabled}" />
+                                    <TextBlock Grid.Column="1" Text="{Binding Name}"
+                                               FontSize="11" VerticalAlignment="Center" Margin="8,0,0,0" />
+                                    <TextBlock Grid.Column="2" Text="{Binding Detail}"
+                                               FontSize="10" VerticalAlignment="Center" Opacity="0.6" />
+                                </Grid>
+                            </DataTemplate>
+                        </ItemsControl.ItemTemplate>
+                    </ItemsControl>
+                </StackPanel>
+            </Border>
+
             <!-- ELF Header -->
             <Border Padding="6,4" CornerRadius="4"
                     Background="{DynamicResource SystemAltMediumLowBrush}">

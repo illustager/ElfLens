@@ -21,6 +21,7 @@ public partial class FileInfoPanelViewModel : PanelViewModel
     [ObservableProperty] private string _fileType = "";
     [ObservableProperty] private bool _isBusy;
 
+    public ObservableCollection<SecurityItem> SecurityInfo { get; } = new();
     public ObservableCollection<KeyValueItem> ElfHeaders { get; } = new();
     public ObservableCollection<SectionItem> Sections { get; } = new();
 
@@ -48,6 +49,9 @@ public partial class FileInfoPanelViewModel : PanelViewModel
 
             var headerOut = await _sshService.ExecuteCommandAsync($"readelf -h \"{TargetPath}\"");
             ParseElfHeader(headerOut);
+
+            var checksecOut = await _sshService.ExecuteCommandAsync($"checksec \"{TargetPath}\"");
+            ParseChecksec(checksecOut);
 
             var sectionsOut = await _sshService.ExecuteCommandAsync($"readelf -SW \"{TargetPath}\"");
             ParseSections(sectionsOut);
@@ -101,7 +105,24 @@ public partial class FileInfoPanelViewModel : PanelViewModel
         ColSizeWidth = Math.Max(Sections.Max(s => s.Size.Length) * charWidth + padding, 50);
         ColFlagsWidth = Math.Max(Sections.Max(s => s.Flags.Length) * charWidth + padding, 50);
     }
+
+    private void ParseChecksec(string output)
+    {
+        SecurityInfo.Clear();
+        foreach (var line in output.Split('\n'))
+        {
+            var m = Regex.Match(line, @"^\s*(RELRO|Stack|NX|PIE)\s*:\s*(.+)$", RegexOptions.IgnoreCase);
+            if (m.Success)
+            {
+                var name = m.Groups[1].Value.Trim();
+                var value = m.Groups[2].Value.Trim();
+                var enabled = !value.StartsWith("No ") && !value.Contains("disabled");
+                SecurityInfo.Add(new SecurityItem(name, enabled, value));
+            }
+        }
+    }
 }
 
 public record KeyValueItem(string Key, string Value);
 public record SectionItem(string Name, string Type, string Address, string Offset, string Size, string Flags);
+public record SecurityItem(string Name, bool Enabled, string Detail);
