@@ -18,6 +18,7 @@ public partial class ShellSession : IDisposable
     private CancellationTokenSource? _readCts;
 
     public event Action<string>? OnOutput;
+    public event Action? OnDisconnected;
 
     internal ShellSession(ShellStream shellStream)
     {
@@ -66,6 +67,7 @@ public partial class ShellSession : IDisposable
         }
         catch (OperationCanceledException) { }
         catch (ObjectDisposedException) { }
+        catch { OnDisconnected?.Invoke(); }
     }
 
     [GeneratedRegex(

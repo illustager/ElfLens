@@ -32,6 +32,11 @@ public partial class MainViewModel : ViewModelBase
         _sshService = new SshService();
         ConnectPage = new ConnectPageViewModel(_sshService, OnConnectionSucceeded);
         ShellPanel = new ShellPanelViewModel(_sshService);
+        ShellPanel.OnDisconnected += () =>
+        {
+            IsConnected = false;
+            ConnectionStatus = "Disconnected";
+        };
         Workspace = new WorkspaceViewModel();
     }
 
