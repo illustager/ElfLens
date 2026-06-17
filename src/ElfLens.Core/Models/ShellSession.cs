@@ -42,12 +42,6 @@ public partial class ShellSession : IDisposable
         }
     }
 
-    /// <summary>
-    /// Executes a command, streaming cleaned output chunks to onChunk.
-    /// No line splitting, no "last line" detection — the terminal data
-    /// flows as-is, minus ANSI codes. The shell's own \r\n provides line breaks.
-    /// The prompt has no trailing \r\n, so the next command echo joins it naturally.
-    /// </summary>
     public async Task ExecuteCommandAsync(
         string command,
         Action<string> onChunk,
@@ -61,8 +55,6 @@ public partial class ShellSession : IDisposable
         }
         finally { _writeLock.Release(); }
     }
-
-    // ---- raw I/O ----
 
     private string ReadAvailable()
     {
@@ -98,9 +90,11 @@ public partial class ShellSession : IDisposable
     private async Task ReadChunksAsync(Action<string> onChunk, CancellationToken ct)
     {
         var buf = new byte[4096];
-        int idle = 0;
-        const int maxIdle = 3; // 150ms
         bool prevEndsWithNewline = false;
+        // Accumulated cleaned text for prompt detection
+        var accum = new StringBuilder();
+        const int maxIdle = 20; // 1 second fallback
+        int idle = 0;
 
         while (!ct.IsCancellationRequested)
         {
@@ -108,34 +102,44 @@ public partial class ShellSession : IDisposable
             while (_shellStream.DataAvailable)
             {
                 int n = _shellStream.Read(buf, 0, buf.Length);
-                if (n > 0)
-                {
-                    var raw = Encoding.UTF8.GetString(buf, 0, n);
-                    var clean = AnsiRegex().Replace(raw, "");
-                    clean = clean.Replace("\r\n", "\n").Replace('\r', '\n');
+                if (n <= 0) break;
 
-                    // Collapse consecutive newlines
-                    clean = MultipleNewlineRegex().Replace(clean, "\n");
+                gotData = true;
+                var raw = Encoding.UTF8.GetString(buf, 0, n);
+                var clean = AnsiRegex().Replace(raw, "");
+                clean = clean.Replace("\r\n", "\n").Replace('\r', '\n');
+                clean = MultipleNewlineRegex().Replace(clean, "\n");
 
-                    // If previous chunk ended with \n and this one starts with \n,
-                    // strip the leading \n from this chunk
-                    if (prevEndsWithNewline && clean.StartsWith('\n'))
-                        clean = clean[1..];
+                if (prevEndsWithNewline && clean.StartsWith('\n'))
+                    clean = clean[1..];
 
-                    if (clean.Length > 0)
-                    {
-                        prevEndsWithNewline = clean[^1] == '\n';
-                        onChunk(clean);
-                        gotData = true;
-                    }
-                }
-                else break;
+                if (clean.Length == 0) continue;
+
+                prevEndsWithNewline = clean[^1] == '\n';
+                onChunk(clean);
+                accum.Append(clean);
             }
 
-            if (gotData) idle = 0;
-            else { idle++; if (idle >= maxIdle) break; }
+            if (gotData)
+            {
+                idle = 0;
+                // Check if the accumulated output ends with the known prompt
+                var text = accum.ToString().TrimEnd('\n');
+                if (text.EndsWith(Prompt, StringComparison.Ordinal))
+                    break; // prompt appeared → command done
+            }
+            else
+            {
+                idle++;
+                if (idle >= maxIdle) break; // 1s fallback
+            }
             await Task.Delay(50, ct);
         }
+
+        // Update prompt from last line (handles changes like shell → GDB → Python)
+        var final = accum.ToString().TrimEnd('\n');
+        var last = final.Split('\n')[^1].Trim();
+        if (last.Length > 0) Prompt = last;
     }
 
     [GeneratedRegex(
