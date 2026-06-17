@@ -131,11 +131,19 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                 : (pcAddr.Length > 0 ? "0x" + pcAddr : "??");
             CurrentFunction = funcName;
 
-            if (!FunctionBlocks.Any(f => f.Name == funcName))
+            var isNew = !FunctionBlocks.Any(f => f.Name == funcName);
+            try { System.IO.File.AppendAllText(
+                System.IO.Path.Combine(System.AppContext.BaseDirectory, "gdb_parse.log"),
+                $"FUNC: {funcName} PC: {pcAddr} NEW: {isNew} BLOCKS: {FunctionBlocks.Count}\n"); } catch { }
+
+            if (isNew)
             {
                 var asm = string.IsNullOrEmpty(pcAddr)
                     ? await Capture("disassemble /r")
                     : await Capture($"disassemble /r 0x{pcAddr}");
+                try { System.IO.File.AppendAllText(
+                    System.IO.Path.Combine(System.AppContext.BaseDirectory, "gdb_parse.log"),
+                    $"ASM LEN: {asm.Length}\n"); } catch { }
                 var block = ParseGdbBlock(asm, funcName, pcAddr);
                 if (block != null)
                 {
