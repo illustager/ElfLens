@@ -73,12 +73,13 @@ public partial class FileInfoPanelViewModel : PanelViewModel
         Sections.Clear();
         foreach (var line in output.Split('\n'))
         {
-            var m = Regex.Match(line, @"^\s*\[\s*(\d+)\]\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(.*)$");
-            if (m.Success && m.Groups[1].Value != "0") // skip section [0] (NULL, has no name)
+            // -W: [Nr] Name Type Address Off Size ES Flg Lk Inf Al
+            var m = Regex.Match(line, @"^\s*\[\s*(\d+)\]\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)\s+(\S+)$");
+            if (m.Success && m.Groups[1].Value != "0") // skip NULL section
             {
                 Sections.Add(new SectionItem(
                     m.Groups[2].Value, m.Groups[3].Value, m.Groups[4].Value,
-                    m.Groups[5].Value, m.Groups[6].Value, m.Groups[8].Value));
+                    m.Groups[5].Value, m.Groups[6].Value, m.Groups[7].Value));
             }
         }
         ComputeSectionColumnWidths();
