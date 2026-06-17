@@ -97,13 +97,15 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         IsBusy = true;
         try
         {
-            var pc = await Capture("info registers pc");
-            var pcM = Regex.Match(pc, @"0x([0-9a-f]+)");
+            // Single capture for all commands to avoid cross-talk
+            var all = await Capture("info registers pc ; info symbol $pc");
+            var pcM = Regex.Match(all, @"0x([0-9a-f]+)");
             var pcAddr = pcM.Success ? pcM.Groups[1].Value : "";
 
-            var fnOut = await Capture("info symbol $pc");
-            var fnM = Regex.Match(fnOut, @"\b([a-zA-Z_]\w+)\b");
-            var funcName = fnM.Success ? fnM.Groups[1].Value : "";
+            var fnM = Regex.Match(all, @"(?:symbol|in)\s+\$pc\b[^:]*:\s*(.+)");
+            var fnRaw = fnM.Success ? fnM.Groups[1].Value.Trim() : "";
+            var nameM = Regex.Match(fnRaw, @"\b([a-zA-Z_]\w+)\b");
+            var funcName = nameM.Success ? nameM.Groups[1].Value : "";
             CurrentFunction = funcName;
 
             // Only disassemble when entering a new function
