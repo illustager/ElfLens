@@ -16,23 +16,15 @@ public partial class ShellPanelViewModel : ViewModelBase
     private readonly List<string> _commandHistory = new();
     private int _historyIndex = -1;
     private readonly StringBuilder _outputBuffer = new();
-    private string _lastPrompt = "";
 
-    [ObservableProperty]
-    private string _inputCommand = string.Empty;
-
-    [ObservableProperty]
-    private bool _isBusy;
-
-    [ObservableProperty]
-    private string _prompt = "$ ";
-
-    [ObservableProperty]
-    private string _outputText = string.Empty;
+    [ObservableProperty] private string _inputCommand = string.Empty;
+    [ObservableProperty] private bool _isBusy;
+    [ObservableProperty] private string _prompt = "$ ";
+    [ObservableProperty] private string _outputText = string.Empty;
 
     public ShellPanelViewModel(ISshService sshService)
     {
-        _sshService = sshService ?? throw new ArgumentNullException(nameof(sshService));
+        _sshService = sshService;
     }
 
     [RelayCommand]
@@ -46,8 +38,7 @@ public partial class ShellPanelViewModel : ViewModelBase
             if (_session != null)
             {
                 Prompt = _session.Prompt + " ";
-                _lastPrompt = _session.Prompt;
-                AppendOutput($"{Prompt}");
+                AppendOutput(Prompt);
             }
             else AppendOutput("!!! Failed to create shell session\n");
         }
@@ -70,15 +61,7 @@ public partial class ShellPanelViewModel : ViewModelBase
         IsBusy = true;
         try
         {
-            var finalLine = await _session.ExecuteCommandAsync(command, line =>
-            {
-                // Non-last lines: add with newline
-                AppendOutput(line + "\n");
-            });
-
-            // finalLine is the prompt — add WITHOUT newline so next command joins it
-            if (finalLine.Length > 0)
-                AppendOutput(finalLine);
+            await _session.ExecuteCommandAsync(command, chunk => AppendOutput(chunk));
         }
         catch (Exception ex) { AppendOutput($"!!! Error: {ex.Message}\n"); }
         finally { IsBusy = false; }
