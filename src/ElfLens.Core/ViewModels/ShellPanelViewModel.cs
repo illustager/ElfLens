@@ -72,11 +72,13 @@ public partial class ShellPanelViewModel : ViewModelBase
         {
             var finalLine = await _session.ExecuteCommandAsync(command, line =>
             {
-                // Each complete line arrives here in real-time
+                // Non-last lines: add with newline
                 AppendOutput(line + "\n");
             });
 
-            // finalLine is the last prompt — kept in buffer for next command continuity
+            // finalLine is the prompt — add WITHOUT newline so next command joins it
+            if (finalLine.Length > 0)
+                AppendOutput(finalLine);
         }
         catch (Exception ex) { AppendOutput($"!!! Error: {ex.Message}\n"); }
         finally { IsBusy = false; }

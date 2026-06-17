@@ -34,19 +34,19 @@ public partial class ShellSession : IDisposable
     {
         var raw = ReadAvailable();
         if (raw.Length == 0) return;
-        var cleaned = AnsiRegex().Replace(raw, "");
-        cleaned = cleaned.Replace("\r\n", "\n").Replace('\r', '\n').Trim();
-        var lines = cleaned.Split('\n');
+        var t = AnsiRegex().Replace(raw, "").Replace("\r\n", "\n").Replace('\r', '\n').Trim();
+        var lines = t.Split('\n');
         for (int i = lines.Length - 1; i >= 0; i--)
         {
-            var t = lines[i].Trim();
-            if (t.Length > 0) { Prompt = t; break; }
+            var s = lines[i].Trim();
+            if (s.Length > 0) { Prompt = s; break; }
         }
     }
 
     /// <summary>
-    /// Executes a command and streams output lines to the callback in real-time.
-    /// Returns the final prompt line (if detected) for display continuity.
+    /// Executes a command.
+    /// All output lines except the final prompt are sent via onLine (each gets \n in the ViewModel).
+    /// The final prompt line is returned so the caller can place it without a trailing newline.
     /// </summary>
     public async Task<string> ExecuteCommandAsync(
         string command,
@@ -57,7 +57,8 @@ public partial class ShellSession : IDisposable
         try
         {
             await _writer.WriteLineAsync(command.AsMemory(), ct);
-            return await ReadLinesAsync(onLine, ct);
+            var lines = await ReadAllLinesAsync(ct);
+            return Emit(lines, onLine);
         }
         finally { _writeLock.Release(); }
     }
@@ -90,37 +91,18 @@ public partial class ShellSession : IDisposable
         var sw = Environment.TickCount;
         while (Environment.TickCount - sw < 1500)
         {
-            while (_shellStream.DataAvailable)
-                _shellStream.Read(buf, 0, buf.Length);
+            while (_shellStream.DataAvailable) _shellStream.Read(buf, 0, buf.Length);
             Thread.Sleep(50);
         }
     }
 
-    private async Task<string> ReadLinesAsync(Action<string> onLine, CancellationToken ct)
+    private async Task<List<string>> ReadAllLinesAsync(CancellationToken ct)
     {
+        var result = new List<string>();
         var leftover = new StringBuilder();
         var buf = new byte[4096];
         int idle = 0;
         const int maxIdle = 3; // 150ms idle → command done
-        string? lastEmitted = null;
-        var recent = new HashSet<string>(); // dedup within this command
-        string? finalLine = null;
-
-        void Emit(string line)
-        {
-            // Consecutive duplicate? Replace previous (keeps last copy)
-            if (line == lastEmitted) return;
-
-            // Non-consecutive duplicate within this command?
-            if (!recent.Add(line)) return;
-
-            // Trim recent set to avoid unbounded growth
-            if (recent.Count > 50) recent.Clear();
-
-            lastEmitted = line;
-            finalLine = line;
-            onLine(line);
-        }
 
         while (!ct.IsCancellationRequested)
         {
@@ -128,11 +110,7 @@ public partial class ShellSession : IDisposable
             while (_shellStream.DataAvailable)
             {
                 int n = _shellStream.Read(buf, 0, buf.Length);
-                if (n > 0)
-                {
-                    leftover.Append(Encoding.UTF8.GetString(buf, 0, n));
-                    gotData = true;
-                }
+                if (n > 0) { leftover.Append(Encoding.UTF8.GetString(buf, 0, n)); gotData = true; }
                 else break;
             }
 
@@ -143,13 +121,10 @@ public partial class ShellSession : IDisposable
                 int idx;
                 while ((idx = text.IndexOf('\n')) >= 0)
                 {
-                    var line = text[..idx];
+                    var raw = text[..idx];
                     text = text[(idx + 1)..];
-
-                    var cleaned = AnsiRegex().Replace(line, "").Replace("\r", "").Trim();
-                    if (cleaned.Length == 0) continue;
-
-                    Emit(cleaned);
+                    var line = AnsiRegex().Replace(raw, "").Replace("\r", "").Trim();
+                    if (line.Length > 0) result.Add(line);
                 }
                 leftover.Clear();
                 leftover.Append(text);
@@ -159,19 +134,57 @@ public partial class ShellSession : IDisposable
                 idle++;
                 if (idle >= maxIdle) break;
             }
-
             await Task.Delay(50, ct);
         }
 
         // Flush leftover
         if (leftover.Length > 0)
         {
-            var cleaned = AnsiRegex().Replace(leftover.ToString(), "").Replace("\r", "").Trim();
-            if (cleaned.Length > 0) Emit(cleaned);
+            var line = AnsiRegex().Replace(leftover.ToString(), "").Replace("\r", "").Trim();
+            if (line.Length > 0) result.Add(line);
         }
 
-        DebugLog("CLEAN", finalLine ?? "(empty)");
-        return finalLine ?? "";
+        return result;
+    }
+
+    /// <summary>
+    /// Deduplicate and emit. Consecutive duplicate → keep last.
+    /// Non-consecutive duplicate within the same output → skip.
+    /// All lines except the last are emitted via callback.
+    /// Returns the last line (prompt) without emitting.
+    /// </summary>
+    private static string Emit(List<string> raw, Action<string> onLine)
+    {
+        if (raw.Count == 0) return "";
+
+        // Pass 1: collapse consecutive duplicates (keep last)
+        var deduped = new List<string>();
+        foreach (var line in raw)
+        {
+            if (deduped.Count > 0 && deduped[^1] == line)
+                deduped.RemoveAt(deduped.Count - 1);
+            deduped.Add(line);
+        }
+
+        // Pass 2: remove non-consecutive duplicates within this output
+        var seen = new HashSet<string>();
+        var final = new List<string>();
+        foreach (var line in deduped)
+        {
+            if (seen.Add(line))
+                final.Add(line);
+        }
+
+        if (final.Count == 0) return "";
+
+        // Emit all but the last line
+        for (int i = 0; i < final.Count - 1; i++)
+            onLine(final[i]);
+
+        // Return last line (prompt)
+        var last = final[^1];
+        DebugLog("RETURN", last);
+        return last;
     }
 
     [GeneratedRegex(
