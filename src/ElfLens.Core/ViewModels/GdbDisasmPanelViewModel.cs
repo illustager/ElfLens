@@ -140,15 +140,11 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         for (int bi = 0; bi < FunctionBlocks.Count; bi++)
         {
             var fb = FunctionBlocks[bi];
-            var changed = false;
-            var newInsts = new List<HighlightedLine>();
-            foreach (var inst in fb.Instructions)
-            {
-                if (inst.IsCurrent) { newInsts.Add(new HighlightedLine(inst.Tokens, false)); changed = true; }
-                else newInsts.Add(inst);
-            }
-            if (changed)
-                FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
+            if (!fb.Instructions.Any(i => i.IsCurrent)) continue;
+            var newInsts = fb.Instructions
+                .Select(inst => new HighlightedLine(inst.Tokens, false))
+                .ToList();
+            FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
         }
     }
 
