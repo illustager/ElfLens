@@ -88,28 +88,42 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         await RefreshAsync();
     }
 
+    private string _lastFunc = "";
+    private string _cachedAsm = "";
+
     private async Task RefreshAsync()
     {
         if (_session == null) return;
         IsBusy = true;
-        Lines.Clear();
         try
         {
-            var pcOut = await Capture("info registers pc");
-            var pcMatch = Regex.Match(pcOut, @"0x([0-9a-f]+)");
-            var pcAddr = pcMatch.Success ? pcMatch.Groups[1].Value : "";
+            var pc = await Capture("info registers pc");
+            var pcM = Regex.Match(pc, @"0x([0-9a-f]+)");
+            var pcAddr = pcM.Success ? pcM.Groups[1].Value : "";
 
-            var funcOut = await Capture("info symbol $pc");
-            var funcMatch = Regex.Match(funcOut, @"\b([a-zA-Z_]\w+)\b");
-            var funcName = funcMatch.Success ? funcMatch.Groups[1].Value : "";
+            var fnOut = await Capture("info symbol $pc");
+            var fnM = Regex.Match(fnOut, @"\b([a-zA-Z_]\w+)\b");
+            var funcName = fnM.Success ? fnM.Groups[1].Value : "";
             CurrentFunction = funcName;
 
-            var asm = string.IsNullOrEmpty(pcAddr)
-                ? await Capture("disassemble /r")
-                : await Capture($"disassemble /r 0x{pcAddr}");
-            ParseGdb(asm, pcAddr);
+            // Only disassemble when entering a new function
+            string asm;
+            if (funcName != _lastFunc || string.IsNullOrEmpty(_cachedAsm))
+            {
+                asm = string.IsNullOrEmpty(pcAddr)
+                    ? await Capture("disassemble /r")
+                    : await Capture($"disassemble /r 0x{pcAddr}");
+                _cachedAsm = asm;
+                _lastFunc = funcName;
+                Lines.Clear();
+                ParseGdb(asm, pcAddr);
+            }
+            else
+            {
+                // Just update highlight
+                UpdateHighlight(pcAddr);
+            }
 
-            // Sync with static disassembly
             if (_staticDisasm.HasFunction(funcName))
                 _staticDisasm.HighlightFunction(funcName, pcAddr);
             else
@@ -117,6 +131,19 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         }
         catch { }
         finally { IsBusy = false; }
+    }
+
+    private void UpdateHighlight(string pcAddr)
+    {
+        for (int i = 0; i < Lines.Count; i++)
+        {
+            var line = Lines[i];
+            // Create new HighlightedLine with updated IsCurrent
+            var tokens = line.Tokens;
+            var isCur = tokens.Any(t =>
+                t.Text.Contains(pcAddr, StringComparison.OrdinalIgnoreCase));
+            Lines[i] = new HighlightedLine(tokens, isCur);
+        }
     }
 
     private async Task<string> Capture(string cmd)
