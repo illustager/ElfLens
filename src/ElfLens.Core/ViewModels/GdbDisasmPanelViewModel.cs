@@ -134,25 +134,36 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
 
     private void ClearAllHighlights()
     {
-        foreach (var fb in FunctionBlocks)
+        for (int bi = 0; bi < FunctionBlocks.Count; bi++)
         {
-            for (int i = 0; i < fb.Instructions.Count; i++)
+            var fb = FunctionBlocks[bi];
+            var changed = false;
+            var newInsts = new List<HighlightedLine>();
+            foreach (var inst in fb.Instructions)
             {
-                if (fb.Instructions[i].IsCurrent)
-                    fb.Instructions[i] = new HighlightedLine(fb.Instructions[i].Tokens, false);
+                if (inst.IsCurrent) { newInsts.Add(new HighlightedLine(inst.Tokens, false)); changed = true; }
+                else newInsts.Add(inst);
             }
+            if (changed)
+                FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts);
         }
     }
 
     private void HighlightInBlock(FunctionItem block, string pcAddr)
     {
-        for (int i = 0; i < block.Instructions.Count; i++)
+        for (int bi = 0; bi < FunctionBlocks.Count; bi++)
         {
-            var line = block.Instructions[i];
-            var isCur = line.Tokens.Any(t =>
-                t.Text.Contains(pcAddr, StringComparison.OrdinalIgnoreCase));
-            if (isCur)
-                block.Instructions[i] = new HighlightedLine(line.Tokens, true);
+            if (FunctionBlocks[bi] != block) continue;
+            var newInsts = new List<HighlightedLine>();
+            foreach (var line in block.Instructions)
+            {
+                var isCur = line.Tokens.Any(t =>
+                    t.Text.Contains(pcAddr, StringComparison.OrdinalIgnoreCase));
+                newInsts.Add(isCur && !line.IsCurrent
+                    ? new HighlightedLine(line.Tokens, true) : line);
+            }
+            FunctionBlocks[bi] = new FunctionItem(block.Name, block.Address, newInsts);
+            break;
         }
     }
 
