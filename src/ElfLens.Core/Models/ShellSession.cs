@@ -100,6 +100,7 @@ public partial class ShellSession : IDisposable
         var buf = new byte[4096];
         int idle = 0;
         const int maxIdle = 3; // 150ms
+        bool prevEndsWithNewline = false;
 
         while (!ct.IsCancellationRequested)
         {
@@ -110,11 +111,20 @@ public partial class ShellSession : IDisposable
                 if (n > 0)
                 {
                     var raw = Encoding.UTF8.GetString(buf, 0, n);
-                    // Strip ANSI, normalize newlines
                     var clean = AnsiRegex().Replace(raw, "");
                     clean = clean.Replace("\r\n", "\n").Replace('\r', '\n');
+
+                    // Collapse consecutive newlines
+                    clean = MultipleNewlineRegex().Replace(clean, "\n");
+
+                    // If previous chunk ended with \n and this one starts with \n,
+                    // strip the leading \n from this chunk
+                    if (prevEndsWithNewline && clean.StartsWith('\n'))
+                        clean = clean[1..];
+
                     if (clean.Length > 0)
                     {
+                        prevEndsWithNewline = clean[^1] == '\n';
                         onChunk(clean);
                         gotData = true;
                     }
@@ -137,6 +147,9 @@ public partial class ShellSession : IDisposable
         @"\x1b[()][0-2AB]|" +
         @"\x1b\[\?[0-9]+[hl]")]
     private static partial Regex AnsiRegex();
+
+    [GeneratedRegex(@"\n\n+")]
+    private static partial Regex MultipleNewlineRegex();
 
     public void Dispose()
     {
