@@ -131,43 +131,33 @@ public partial class ShellSession : IDisposable
         var text = AnsiRegex().Replace(raw, "");
         text = text.Replace("\r\n", "\n").Replace('\r', '\n');
 
-        var lines = new List<string>();
+        // First pass: collapse consecutive duplicate prompt lines, keep last copy
+        var deduped = new List<string>();
         foreach (var line in text.Split('\n'))
         {
-            var isBlank = line.Trim().Length == 0;
+            if (line.Trim().Length == 0)
+                continue; // skip blank lines
 
-            if (isBlank)
-                continue;  // skip all blank lines
+            // Replace consecutive duplicates (prompt\nprompt → keep last)
+            if (deduped.Count > 0 && deduped[^1] == line)
+                deduped.RemoveAt(deduped.Count - 1);
 
-            // If the new line is identical to the last non-blank line,
-            // REPLACE the old one — keep the last copy (no trailing \r\n in raw)
-            if (lines.Count > 0)
-            {
-                int prevIdx = lines.Count - 1;
-                while (prevIdx >= 0 && lines[prevIdx] == "")
-                    prevIdx--;
-                if (prevIdx >= 0 && lines[prevIdx] == line)
-                {
-                    // Remove old copy and any trailing blank it had after it
-                    lines.RemoveAt(prevIdx);
-                    // Also remove trailing blanks that were after the old copy
-                    while (lines.Count > 0 && lines[^1] == "")
-                        lines.RemoveAt(lines.Count - 1);
-                    // Fall through to add the new copy
-                }
-            }
-
-            lines.Add(line);
+            deduped.Add(line);
         }
 
-        // Remove trailing blanks
-        while (lines.Count > 0 && lines[^1] == "")
-            lines.RemoveAt(lines.Count - 1);
+        // Second pass: remove any non-blank line that appears more than once
+        var seen = new HashSet<string>();
+        var result = new List<string>();
+        foreach (var line in deduped)
+        {
+            if (seen.Add(line))
+                result.Add(line);
+        }
 
-        if (lines.Count == 0) return "(no output)";
-        var result = string.Join("\n", lines);
-        DebugLog("CLEAN", result);
-        return result;
+        if (result.Count == 0) return "(no output)";
+        var output = string.Join("\n", result);
+        DebugLog("CLEAN", output);
+        return output;
     }
 
     [GeneratedRegex(
