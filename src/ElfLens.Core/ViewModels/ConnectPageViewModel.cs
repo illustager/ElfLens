@@ -12,27 +12,26 @@ public partial class ConnectPageViewModel : ViewModelBase
     private readonly ISshService _sshService;
     private readonly Action<SshConnectionInfo>? _onConnected;
 
-    // TODO: remove test defaults before release
     [ObservableProperty]
-    private string _host = "localhost";
+    private string _host = string.Empty;
 
     [ObservableProperty]
     private int _port = 22;
 
     [ObservableProperty]
-    private string _username = "petrichor";
+    private string _username = string.Empty;
 
     [ObservableProperty]
     private bool _usePasswordAuth = true;
 
     [ObservableProperty]
-    private string? _password = "05041221";
+    private string? _password;
 
     [ObservableProperty]
     private string? _keyFilePath;
 
     [ObservableProperty]
-    private string _targetBinaryPath = "/home/petrichor/wkspc/toybox/doodles/test";
+    private string _targetBinaryPath = string.Empty;
 
     [ObservableProperty]
     private string? _errorMessage;

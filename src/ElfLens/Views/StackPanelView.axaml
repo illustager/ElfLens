@@ -1,0 +1,86 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ElfLens.Core.ViewModels"
+             xmlns:sys="using:System"
+             xmlns:cnv="using:ElfLens.Converters"
+             xmlns:core="using:ElfLens.Core"
+             x:Class="ElfLens.Views.StackPanelView"
+             x:DataType="vm:StackPanelViewModel">
+
+    <Grid RowDefinitions="Auto,*" Margin="4">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4" Margin="0,0,0,4">
+            <Button Content="Refresh" Command="{Binding RefreshCommand}"
+                    Padding="6,2" FontSize="11"
+                    IsEnabled="{Binding HasSession}" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1">
+            <ItemsControl ItemsSource="{Binding Frames}" x:CompileBindings="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:StackFrameItem">
+                        <Border Margin="0,0,0,1" Padding="3,1"
+                                Background="{DynamicResource SystemAltMediumLowBrush}"
+                                CornerRadius="2">
+                            <StackPanel>
+                                <!-- Frame header with toggle -->
+                                <Button Padding="2,1" Background="Transparent"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left"
+                                        Click="OnFrameToggleClick">
+                                    <StackPanel Orientation="Horizontal" Spacing="6" MinHeight="18">
+                                        <TextBlock Text="▸" FontSize="9" Width="10"
+                                                   IsVisible="{Binding IsExpanded, Converter={x:Static BoolConverters.Not}}"
+                                                   Foreground="#546E7A" VerticalAlignment="Center" />
+                                        <TextBlock Text="▾" FontSize="9" Width="10"
+                                                   IsVisible="{Binding IsExpanded}"
+                                                   Foreground="#546E7A" VerticalAlignment="Center" />
+                                        <TextBlock Text="{Binding FrameNum, StringFormat='#{0}'}"
+                                                   FontSize="11" FontWeight="Bold"
+                                                   FontFamily="Cascadia Code, Consolas, monospace"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="#546E7A"
+                                                   Width="24" />
+                                        <TextBlock Text="{Binding Function}"
+                                                   FontSize="11"
+                                                   FontFamily="Cascadia Code, Consolas, monospace"
+                                                   VerticalAlignment="Center"
+                                                   Foreground="#4FC3F7" />
+                                        <TextBlock Text="{Binding Address}"
+                                                   FontSize="10"
+                                                   FontFamily="Cascadia Code, Consolas, monospace"
+                                                   VerticalAlignment="Center"
+                                                   Opacity="0.4" />
+                                    </StackPanel>
+                                </Button>
+                                <!-- Expanded memory dump with colored tokens -->
+                                <ItemsControl ItemsSource="{Binding MemoryLines}"
+                                              IsVisible="{Binding IsExpanded}"
+                                              Margin="16,2,4,4" x:CompileBindings="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:HighlightedLine">
+                                            <ItemsControl ItemsSource="{Binding Tokens}" x:CompileBindings="False">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="core:Token">
+                                                        <TextBlock Text="{Binding Text}"
+                                                                   FontSize="10"
+                                                                   FontFamily="Cascadia Code, Consolas, monospace"
+                                                                   Foreground="{Binding Color, Converter={x:Static cnv:HighlightConverters.HexToBrush}}" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

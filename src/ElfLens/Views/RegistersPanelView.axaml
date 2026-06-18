@@ -1,0 +1,46 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ElfLens.Core.ViewModels"
+             x:Class="ElfLens.Views.RegistersPanelView"
+             x:DataType="vm:RegistersPanelViewModel">
+
+    <Grid RowDefinitions="Auto,*" Margin="4">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4" Margin="0,0,0,4">
+            <Button Content="Refresh" Command="{Binding RefreshCommand}"
+                    Padding="6,2" FontSize="11"
+                    IsEnabled="{Binding HasSession}" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1">
+            <ItemsControl ItemsSource="{Binding Registers}" x:CompileBindings="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:RegisterEntry">
+                        <Border Margin="0,0,0,1" Padding="3,1"
+                                Background="{DynamicResource SystemAltMediumLowBrush}"
+                                CornerRadius="2">
+                            <Grid ColumnDefinitions="68,*,Auto" MinHeight="18">
+                                <TextBlock Grid.Column="0" Text="{Binding Name}"
+                                           FontSize="11" FontWeight="Bold"
+                                           FontFamily="Cascadia Code, Consolas, monospace"
+                                           VerticalAlignment="Center"
+                                           Foreground="#CE93D8" />
+                                <TextBlock Grid.Column="1" Text="{Binding HexValue}"
+                                           FontSize="11"
+                                           FontFamily="Cascadia Code, Consolas, monospace"
+                                           VerticalAlignment="Center"
+                                           Foreground="#FFE082"
+                                           Margin="8,0,0,0" />
+                                <TextBlock Grid.Column="2" Text="{Binding DecValue}"
+                                           FontSize="10"
+                                           FontFamily="Cascadia Code, Consolas, monospace"
+                                           VerticalAlignment="Center"
+                                           Opacity="0.4"
+                                           Margin="8,0,0,0" />
+                            </Grid>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+</UserControl>

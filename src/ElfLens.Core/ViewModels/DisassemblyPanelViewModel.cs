@@ -10,7 +10,7 @@ using ElfLens.Core.Services;
 
 namespace ElfLens.Core.ViewModels;
 
-public record HighlightedLine(List<Token> Tokens, bool IsCurrent = false, bool IsBreakpoint = false);
+public record HighlightedLine(List<Token> Tokens, bool IsCurrent = false, bool IsBreakpoint = false, bool IsBreakpointDisabled = false);
 
 public partial class FunctionItem : ObservableObject
 {
@@ -24,6 +24,40 @@ public partial class FunctionItem : ObservableObject
     { Name = name; Address = addr; Instructions = insts; }
 
     [RelayCommand] private void Toggle() => IsExpanded = !IsExpanded;
+
+    /// <summary>Mark instruction lines matching (func, offset, enabled) breakpoints in-place.</summary>
+    public static void MarkBreakpoints(IList<FunctionItem> items, List<(string func, int offset, bool enabled)> bps)
+    {
+        for (int bi = 0; bi < items.Count; bi++)
+        {
+            var fb = items[bi];
+            if (!long.TryParse(fb.Address, System.Globalization.NumberStyles.HexNumber, null, out var baseAddr))
+                continue;
+            var changed = false;
+            var newInsts = new List<HighlightedLine>();
+            foreach (var line in fb.Instructions)
+            {
+                var isBp = false;
+                var isDisabled = false;
+                var firstText = line.Tokens.FirstOrDefault()?.Text ?? "";
+                var addrM = Regex.Match(firstText, @"([0-9a-fA-F]+)");
+                if (addrM.Success && long.TryParse(addrM.Groups[1].Value,
+                    System.Globalization.NumberStyles.HexNumber, null, out var instAddr))
+                {
+                    var byteOffset = (int)(instAddr - baseAddr);
+                    foreach (var bp in bps)
+                    {
+                        if (fb.Name == bp.func && byteOffset == bp.offset)
+                        { isBp = true; isDisabled = !bp.enabled; break; }
+                    }
+                }
+                if (isBp != line.IsBreakpoint || isDisabled != line.IsBreakpointDisabled) changed = true;
+                newInsts.Add(new HighlightedLine(line.Tokens, line.IsCurrent, isBp, isDisabled));
+            }
+            if (changed)
+                items[bi] = new FunctionItem(fb.Name, fb.Address, newInsts) { IsExpanded = fb.IsExpanded };
+        }
+    }
 }
 
 public partial class DisassemblyPanelViewModel : PanelViewModel
@@ -80,38 +114,8 @@ public partial class DisassemblyPanelViewModel : PanelViewModel
         Functions.Any(f => f.Name == name);
 
     /// <summary>Mark instruction lines matching (func, offset) breakpoints.</summary>
-    public void MarkBreakpoints(List<(string func, int offset)> bps)
-    {
-        for (int bi = 0; bi < Functions.Count; bi++)
-        {
-            var fb = Functions[bi];
-            if (!long.TryParse(fb.Address, System.Globalization.NumberStyles.HexNumber, null, out var baseAddr))
-                continue;
-            var changed = false;
-            var newInsts = new List<HighlightedLine>();
-            foreach (var line in fb.Instructions)
-            {
-                var isBp = false;
-                // Extract instruction address from first token (format: "  401000:\t")
-                var firstText = line.Tokens.FirstOrDefault()?.Text ?? "";
-                var addrM = Regex.Match(firstText, @"([0-9a-fA-F]+)");
-                if (addrM.Success && long.TryParse(addrM.Groups[1].Value,
-                    System.Globalization.NumberStyles.HexNumber, null, out var instAddr))
-                {
-                    var byteOffset = (int)(instAddr - baseAddr);
-                    foreach (var bp in bps)
-                    {
-                        if (fb.Name == bp.func && byteOffset == bp.offset)
-                        { isBp = true; break; }
-                    }
-                }
-                if (isBp != line.IsBreakpoint) changed = true;
-                newInsts.Add(new HighlightedLine(line.Tokens, line.IsCurrent, isBp));
-            }
-            if (changed)
-                Functions[bi] = new FunctionItem(fb.Name, fb.Address, newInsts) { IsExpanded = fb.IsExpanded };
-        }
-    }
+    public void MarkBreakpoints(List<(string func, int offset, bool enabled)> bps) =>
+        FunctionItem.MarkBreakpoints(Functions, bps);
 
     private void ParseObjdump(string output, string? highlightPc = null)
     {

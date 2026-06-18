@@ -29,6 +29,9 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
 
     private void UpdateHighlight(string pc)
     {
+        // Parse PC as number for exact comparison (avoid substring/zero-padding mismatches)
+        if (!long.TryParse(pc, System.Globalization.NumberStyles.HexNumber, null, out var pcVal)) return;
+
         string? foundName = null;
         for (int bi = 0; bi < FunctionBlocks.Count; bi++)
         {
@@ -37,12 +40,14 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
             var newInsts = new List<HighlightedLine>();
             foreach (var line in fb.Instructions)
             {
-                var first = line.Tokens.FirstOrDefault();
-                var isCur = first?.Text.Trim()
-                    .Contains(pc, StringComparison.OrdinalIgnoreCase) == true;
+                var firstText = line.Tokens.FirstOrDefault()?.Text.Trim() ?? "";
+                var addrM = Regex.Match(firstText, @"([0-9a-fA-F]+)");
+                var isCur = addrM.Success
+                    && long.TryParse(addrM.Groups[1].Value, System.Globalization.NumberStyles.HexNumber, null, out var tokAddr)
+                    && tokAddr == pcVal;
                 if (isCur != line.IsCurrent) changed = true;
                 if (isCur) foundName = fb.Name;
-                newInsts.Add(new HighlightedLine(line.Tokens, isCur, line.IsBreakpoint));
+                newInsts.Add(new HighlightedLine(line.Tokens, isCur, line.IsBreakpoint, line.IsBreakpointDisabled));
             }
             if (changed)
                 FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts) { IsExpanded = fb.IsExpanded };
@@ -68,38 +73,8 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         BreakpointRequested?.Invoke(func, offset);
 
     /// <summary>Mark instruction lines matching (func, offset) breakpoints.</summary>
-    public void MarkBreakpoints(List<(string func, int offset)> bps)
-    {
-        for (int bi = 0; bi < FunctionBlocks.Count; bi++)
-        {
-            var fb = FunctionBlocks[bi];
-            if (!long.TryParse(fb.Address, System.Globalization.NumberStyles.HexNumber, null, out var baseAddr))
-                continue;
-            var changed = false;
-            var newInsts = new List<HighlightedLine>();
-            foreach (var line in fb.Instructions)
-            {
-                var isBp = false;
-                // Extract instruction address from first token (format: "  401000:\t")
-                var firstText = line.Tokens.FirstOrDefault()?.Text ?? "";
-                var addrM = Regex.Match(firstText, @"([0-9a-fA-F]+)");
-                if (addrM.Success && long.TryParse(addrM.Groups[1].Value,
-                    System.Globalization.NumberStyles.HexNumber, null, out var instAddr))
-                {
-                    var byteOffset = (int)(instAddr - baseAddr);
-                    foreach (var bp in bps)
-                    {
-                        if (fb.Name == bp.func && byteOffset == bp.offset)
-                        { isBp = true; break; }
-                    }
-                }
-                if (isBp != line.IsBreakpoint) changed = true;
-                newInsts.Add(new HighlightedLine(line.Tokens, line.IsCurrent, isBp));
-            }
-            if (changed)
-                FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts) { IsExpanded = fb.IsExpanded };
-        }
-    }
+    public void MarkBreakpoints(List<(string func, int offset, bool enabled)> bps) =>
+        FunctionItem.MarkBreakpoints(FunctionBlocks, bps);
 
     public GdbDisasmPanelViewModel(ISshService sshService, DisassemblyPanelViewModel staticDisasm)
     {
@@ -127,7 +102,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
             await Task.Delay(500);
             await RefreshAsync();
         }
-        catch { }
+        catch (Exception) { }
         finally { IsBusy = false; }
     }
 
@@ -181,14 +156,14 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
                     var fb = FunctionBlocks[bi];
                     fb.IsExpanded = false;
                     var newInsts = fb.Instructions
-                        .Select(inst => new HighlightedLine(inst.Tokens, false, inst.IsBreakpoint))
+                        .Select(inst => new HighlightedLine(inst.Tokens, false, inst.IsBreakpoint, inst.IsBreakpointDisabled))
                         .ToList();
                     FunctionBlocks[bi] = new FunctionItem(fb.Name, fb.Address, newInsts) { IsExpanded = fb.IsExpanded };
                 }
                 return;
             }
 
-            var nameM = Regex.Match(all, @"<([a-zA-Z_]\w*)(?:\+\d+)?>");
+            var nameM = Regex.Match(all, @"<([a-zA-Z_]\w*)");
             var funcName = nameM.Success ? nameM.Groups[1].Value
                 : (pcAddr.Length > 0 ? "0x" + pcAddr : "??");
             CurrentFunction = funcName;
@@ -215,30 +190,15 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
             else
                 _staticDisasm.HighlightFunction(null, null);
         }
-        catch { }
+        catch (Exception) { }
         finally { IsBusy = false; }
     }
 
     private async Task<string> Capture(string cmd)
     {
         if (_session == null) return "";
-        var sb = new List<string>();
-        var done = new TaskCompletionSource<bool>();
-        var collecting = false;
-        void H(string c)
-        {
-            if (!collecting) return;
-            sb.Add(c);
-            if (sb.Any(s => s.Contains("End of assembler dump.")) ||
-                sb.Sum(s => s.Length) > 50000)
-                done.TrySetResult(true);
-        }
-        _session.OnOutput += H;
-        collecting = true;
-        await _session.SendCommandAsync(cmd);
-        await Task.WhenAny(done.Task, Task.Delay(500));
-        _session.OnOutput -= H;
-        return string.Join("", sb);
+        return await _session.CaptureOutputAsync(cmd, 500,
+            stopPredicate: s => s.Contains("End of assembler dump."));
     }
 
     private static List<Token> TokenizeGdbLine(string addr, string body)
@@ -279,23 +239,6 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
         return "#B0BEC5";
     }
 
-    // Register names (GDB format without % prefix)
-    private static readonly HashSet<string> RegNames = new()
-    {
-        "rax","rbx","rcx","rdx","rsi","rdi","rbp","rsp","rip",
-        "eax","ebx","ecx","edx","esi","edi","ebp","esp","eip",
-        "ax","bx","cx","dx","si","di","bp","sp",
-        "al","ah","bl","bh","cl","ch","dl","dh",
-        "r8","r9","r10","r11","r12","r13","r14","r15",
-        "r8d","r9d","r10d","r11d","r12d","r13d","r14d","r15d",
-        "xmm0","xmm1","xmm2","xmm3","xmm4","xmm5","xmm6","xmm7",
-        "ymm0","ymm1","ymm2","ymm3",
-        "cs","ds","es","fs","gs","ss",
-        "st0","st1","st2","st3","st4","st5","st6","st7",
-        "cr0","cr2","cr3","cr4","dr0","dr1","dr2","dr3","dr6","dr7",
-        "mm0","mm1","mm2","mm3","mm4","mm5","mm6","mm7",
-    };
-
     private static void TokenizeOperands(string text, List<Token> tokens)
     {
         int p = 0;
@@ -321,7 +264,7 @@ public partial class GdbDisasmPanelViewModel : PanelViewModel
             }
             // Register (GDB format, no %): match known register names
             var wordM = Regex.Match(text[p..], @"^[a-z][a-z0-9]*");
-            if (wordM.Success && RegNames.Contains(wordM.Value.ToLower()))
+            if (wordM.Success && RegisterNames.All.Contains(wordM.Value.ToLower()))
             {
                 if (p < wordM.Index + p) tokens.Add(new Token(text[p..(p + wordM.Index)], "#B0BEC5"));
                 tokens.Add(new Token(wordM.Value, "#CE93D8"));

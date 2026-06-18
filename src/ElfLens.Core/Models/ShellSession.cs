@@ -39,6 +39,36 @@ public partial class ShellSession : IDisposable
         finally { _writeLock.Release(); }
     }
 
+    /// <summary>
+    /// Sends a command and captures output until the stop predicate matches,
+    /// output exceeds 8000 chars, the GDB prompt appears, or timeout expires.
+    /// </summary>
+    public async Task<string> CaptureOutputAsync(
+        string command,
+        int timeoutMs = 800,
+        Func<string, bool>? stopPredicate = null)
+    {
+        var output = new List<string>();
+        var done = new TaskCompletionSource<bool>();
+
+        void Handler(string chunk)
+        {
+            output.Add(chunk);
+            var total = output.Sum(x => x.Length);
+            if (total > 8000
+                || chunk.Contains("(gdb)") || chunk.Contains("pwndbg>")
+                || (stopPredicate?.Invoke(string.Join("", output)) == true))
+                done.TrySetResult(true);
+        }
+
+        OnOutput += Handler;
+        await SendCommandAsync(command);
+        await Task.WhenAny(done.Task, Task.Delay(timeoutMs));
+        OnOutput -= Handler;
+
+        return string.Join("", output);
+    }
+
     private async Task ReadLoopAsync(CancellationToken ct)
     {
         var buf = new byte[4096];

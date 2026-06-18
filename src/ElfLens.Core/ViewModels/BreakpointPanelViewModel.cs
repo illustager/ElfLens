@@ -19,23 +19,20 @@ public partial class BreakpointEntry : ObservableObject
     [ObservableProperty] private string _resolvedFunc = ""; // resolved function name
 }
 
-public partial class BreakpointPanelViewModel : PanelViewModel
+public partial class BreakpointPanelViewModel : SessionPanelViewModel
 {
     public override string Title => "Breakpoints";
     public override PanelZone Zone => PanelZone.Right;
 
     [ObservableProperty] private string _newBreakpoint = "";
-    [ObservableProperty] private bool _hasSession;
 
     public ObservableCollection<BreakpointEntry> Entries { get; } = new();
 
-    private ShellSession? _session;
     private Action? _onBreakpointsChanged;
 
-    public void SetSession(ShellSession? session)
+    public override void SetSession(ShellSession? session)
     {
-        _session = session;
-        HasSession = session != null;
+        base.SetSession(session);
         if (session != null)
             _ = BatchApplyAsync();
     }
@@ -54,7 +51,7 @@ public partial class BreakpointPanelViewModel : PanelViewModel
         Entries.Add(entry);
         NewBreakpoint = "";
         NotifyChanged();
-        if (_session != null) _ = ApplySingleAsync(loc, entry);
+        if (Session != null) _ = ApplySingleAsync(loc, entry);
     }
 
     /// <summary>Add breakpoint from disassembly panel right-click (func+offset).</summary>
@@ -64,15 +61,15 @@ public partial class BreakpointPanelViewModel : PanelViewModel
         var entry = new BreakpointEntry { Location = loc };
         Entries.Add(entry);
         NotifyChanged();
-        if (_session != null) _ = ApplySingleAsync(loc, entry);
+        if (Session != null) _ = ApplySingleAsync(loc, entry);
     }
 
     [RelayCommand]
     private void Remove(BreakpointEntry? entry)
     {
         if (entry == null) return;
-        if (_session != null && entry.GdbNum.Length > 0)
-            _ = _session.SendCommandAsync($"delete {entry.GdbNum}");
+        if (Session != null && entry.GdbNum.Length > 0)
+            _ = Session.SendCommandAsync($"delete {entry.GdbNum}");
         Entries.Remove(entry);
         NotifyChanged();
     }
@@ -82,8 +79,8 @@ public partial class BreakpointPanelViewModel : PanelViewModel
     {
         if (entry == null) return;
         entry.Enabled = !entry.Enabled;
-        if (_session != null && entry.GdbNum.Length > 0)
-            _ = _session.SendCommandAsync(entry.Enabled
+        if (Session != null && entry.GdbNum.Length > 0)
+            _ = Session.SendCommandAsync(entry.Enabled
                 ? $"enable {entry.GdbNum}"
                 : $"disable {entry.GdbNum}");
         NotifyChanged();
@@ -91,7 +88,7 @@ public partial class BreakpointPanelViewModel : PanelViewModel
 
     private async Task BatchApplyAsync()
     {
-        if (_session == null) return;
+        if (Session == null) return;
         foreach (var e in Entries.Where(e => e.Enabled))
             await ApplySingleAsync(e.Location, e);
         await RefreshFromGdbAsync();
@@ -99,20 +96,14 @@ public partial class BreakpointPanelViewModel : PanelViewModel
 
     private async Task ApplySingleAsync(string loc, BreakpointEntry? entry = null)
     {
-        if (_session == null) return;
-        // Capture the break command output to get assigned number
-        var output = new List<string>();
-        var done = new TaskCompletionSource<bool>();
-        void H(string c) { output.Add(c); if (output.Any(s => s.Contains("Breakpoint"))) done.TrySetResult(true); }
-        _session.OnOutput += H;
-        await _session.SendCommandAsync($"break {loc}");
-        await Task.WhenAny(done.Task, Task.Delay(800));
-        _session.OnOutput -= H;
+        if (Session == null) return;
+        var text = await Session.CaptureOutputAsync($"break {loc}",
+            stopPredicate: s => s.Contains("Breakpoint"));
 
         // Parse breakpoint number from output like "Breakpoint 1 at 0x401000"
         if (entry != null)
         {
-            var m = Regex.Match(string.Join("", output),
+            var m = Regex.Match(text,
                 @"Breakpoint\s+(\d+)\s+at\s+(0x[0-9a-fA-F]+)(?:\s+in\s+(\S+))?");
             if (m.Success)
             {
@@ -125,16 +116,10 @@ public partial class BreakpointPanelViewModel : PanelViewModel
 
     public async Task RefreshFromGdbAsync()
     {
-        if (_session == null || !HasSession) return;
-        var text = new List<string>();
-        var done = new TaskCompletionSource<bool>();
-        void H(string c) { text.Add(c); if (text.Any(s => s.Contains("No breakpoints") || text.Sum(x => x.Length) > 5000)) done.TrySetResult(true); }
-        _session.OnOutput += H;
-        await _session.SendCommandAsync("info breakpoints");
-        await Task.WhenAny(done.Task, Task.Delay(800));
-        _session.OnOutput -= H;
+        if (Session == null || !HasSession) return;
+        var output = await Session.CaptureOutputAsync("info breakpoints",
+            stopPredicate: s => s.Contains("No breakpoints"));
 
-        var output = string.Join("", text);
         if (output.Contains("No breakpoints"))
         {
             foreach (var e in Entries) { e.GdbNum = ""; e.ResolvedAddr = ""; e.ResolvedFunc = ""; }
@@ -166,19 +151,19 @@ public partial class BreakpointPanelViewModel : PanelViewModel
 
     private void NotifyChanged() => _onBreakpointsChanged?.Invoke();
 
-    /// <summary>Returns addresses (hex strings) from func/offset-type breakpoints for marking.</summary>
-    public List<(string func, int offset)> GetFuncBreakpoints()
+    /// <summary>Returns (func, offset, enabled) tuples for marking breakpoints on disassembly.</summary>
+    public List<(string func, int offset, bool enabled)> GetFuncBreakpoints()
     {
-        var result = new List<(string, int)>();
-        foreach (var e in Entries.Where(e => e.Enabled))
+        var result = new List<(string, int, bool)>();
+        foreach (var e in Entries)
         {
             var loc = e.Location;
             // func+offset (with optional * prefix)
             var m = Regex.Match(loc, @"^\*?([a-zA-Z_]\w*)\+(\d+)$");
-            if (m.Success) { result.Add((m.Groups[1].Value, int.Parse(m.Groups[2].Value))); continue; }
+            if (m.Success) { result.Add((m.Groups[1].Value, int.Parse(m.Groups[2].Value), e.Enabled)); continue; }
             // func only (with optional * prefix)
             var m2 = Regex.Match(loc, @"^\*?([a-zA-Z_]\w*)$");
-            if (m2.Success) { result.Add((m2.Groups[1].Value, 0)); continue; }
+            if (m2.Success) { result.Add((m2.Groups[1].Value, 0, e.Enabled)); continue; }
             // *addr — skip for marking
         }
         return result;

@@ -19,12 +19,13 @@ public partial class MainViewModel : ViewModelBase
     [ObservableProperty] private PanelViewModel? _selectedBottomPanel;
 
     public ConnectPageViewModel ConnectPage { get; }
-    public WorkspaceViewModel Workspace { get; }
     public ShellPanelViewModel ShellPanel { get; }
     public FileInfoPanelViewModel FileInfoPanel { get; }
     public DisassemblyPanelViewModel DisassemblyPanel { get; }
     public GdbDisasmPanelViewModel GdbDisasmPanel { get; }
     public BreakpointPanelViewModel BreakpointPanel { get; }
+    public RegistersPanelViewModel RegistersPanel { get; }
+    public StackPanelViewModel StackPanel { get; }
 
     public ObservableCollection<PanelViewModel> LeftPanels { get; } = new();
     public ObservableCollection<PanelViewModel> CenterPanels { get; } = new();
@@ -42,9 +43,12 @@ public partial class MainViewModel : ViewModelBase
         DisassemblyPanel = new DisassemblyPanelViewModel(_sshService);
         GdbDisasmPanel = new GdbDisasmPanelViewModel(_sshService, DisassemblyPanel);
         BreakpointPanel = new BreakpointPanelViewModel();
-        Workspace = new WorkspaceViewModel();
+        RegistersPanel = new RegistersPanelViewModel();
+        StackPanel = new StackPanelViewModel();
 
         BottomPanels.Add(ShellPanel);
+        LeftPanels.Add(RegistersPanel);
+        LeftPanels.Add(StackPanel);
         RightPanels.Add(FileInfoPanel);
         RightPanels.Add(BreakpointPanel);
         CenterPanels.Add(DisassemblyPanel);
@@ -74,6 +78,8 @@ public partial class MainViewModel : ViewModelBase
                 BottomPanels.Add(_gdbShellPanel);
                 SelectedBottomPanel = _gdbShellPanel;
                 BreakpointPanel.SetSession(session);
+                RegistersPanel.SetSession(session);
+                StackPanel.SetSession(session);
             }
             else
             {
@@ -83,6 +89,8 @@ public partial class MainViewModel : ViewModelBase
                     _gdbShellPanel = null;
                 }
                 BreakpointPanel.SetSession(null);
+                RegistersPanel.SetSession(null);
+                StackPanel.SetSession(null);
             }
         };
     }
