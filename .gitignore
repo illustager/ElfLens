@@ -32,3 +32,4 @@ _ReSharper.Caches/
 ## OS
 .DS_Store
 Thumbs.db
+/.claude/
