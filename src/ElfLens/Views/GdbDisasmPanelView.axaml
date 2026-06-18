@@ -1,0 +1,120 @@
+<UserControl xmlns="https://github.com/avaloniaui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:vm="using:ElfLens.Core.ViewModels"
+             xmlns:cnv="using:ElfLens.Converters"
+             xmlns:core="using:ElfLens.Core"
+             x:Class="ElfLens.Views.GdbDisasmPanelView"
+             x:DataType="vm:GdbDisasmPanelViewModel">
+
+    <Grid RowDefinitions="Auto,*" Margin="4">
+        <StackPanel Grid.Row="0" Orientation="Horizontal" Spacing="4">
+            <Button Content="Start Debugging" Command="{Binding StartDebuggingCommand}"
+                    Padding="6,2" FontSize="11" Classes="start"
+                    IsVisible="{Binding IsDebugging, Converter={x:Static BoolConverters.Not}}" />
+            <Button Content="Step Into" Command="{Binding StepIntoCommand}"
+                    Padding="6,2" FontSize="11" Classes="debug"
+                    IsVisible="{Binding IsDebugging}" />
+            <Button Content="Step Over" Command="{Binding StepOverCommand}"
+                    Padding="6,2" FontSize="11" Classes="debug"
+                    IsVisible="{Binding IsDebugging}" />
+            <Button Content="Continue" Command="{Binding ContinueCommand}"
+                    Padding="6,2" FontSize="11" Classes="debug"
+                    IsVisible="{Binding IsDebugging}" />
+            <Button Content="Restart" Command="{Binding RestartCommand}"
+                    Padding="6,2" FontSize="11" Classes="debug"
+                    IsVisible="{Binding IsDebugging}" />
+            <Button Content="Stop" Command="{Binding StopCommand}"
+                    Padding="6,2" FontSize="11" Classes="stop"
+                    IsVisible="{Binding IsDebugging}" />
+            <TextBlock Text="{Binding CurrentFunction}" FontSize="12"
+                       VerticalAlignment="Center" Opacity="0.7" Margin="8,0,0,0" />
+        </StackPanel>
+
+        <ScrollViewer Grid.Row="1"
+                      HorizontalScrollBarVisibility="Auto"
+                      VerticalScrollBarVisibility="Auto">
+            <ItemsControl ItemsSource="{Binding FunctionBlocks}" x:CompileBindings="False">
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:FunctionItem">
+                        <Border Margin="0,0,0,2"
+                                Background="{DynamicResource SystemAltMediumLowBrush}"
+                                CornerRadius="3">
+                            <StackPanel>
+                                <!-- Header with toggle -->
+                                <Button Padding="6,3" Background="Transparent"
+                                        HorizontalAlignment="Stretch"
+                                        HorizontalContentAlignment="Left"
+                                        Command="{Binding ToggleCommand}">
+                                    <StackPanel Orientation="Horizontal" Spacing="6">
+                                        <TextBlock Text="▸" FontSize="10" Width="12"
+                                                   IsVisible="{Binding IsExpanded, Converter={x:Static BoolConverters.Not}}" />
+                                        <TextBlock Text="▾" FontSize="10" Width="12"
+                                                   IsVisible="{Binding IsExpanded}" />
+                                        <TextBlock FontSize="11" FontFamily="Cascadia Code, Consolas, monospace">
+                                            <TextBlock.Text>
+                                                <MultiBinding StringFormat="{}{0}: {1} ({2} instructions)">
+                                                    <Binding Path="Address" />
+                                                    <Binding Path="Name" />
+                                                    <Binding Path="Instructions.Count" />
+                                                </MultiBinding>
+                                            </TextBlock.Text>
+                                        </TextBlock>
+                                    </StackPanel>
+                                </Button>
+                                <!-- Instructions -->
+                                <ItemsControl ItemsSource="{Binding Instructions}"
+                                              IsVisible="{Binding IsExpanded}"
+                                              Margin="16,0,4,4" x:CompileBindings="False">
+                                    <ItemsControl.ItemTemplate>
+                                        <DataTemplate x:DataType="vm:HighlightedLine">
+                                            <Border BorderBrush="{Binding Converter={x:Static cnv:HighlightConverters.BreakpointBorder}}"
+                                                    BorderThickness="3,0,0,0">
+                                                <Border.ContextMenu>
+                                                    <ContextMenu FontSize="11" FontFamily="Segoe UI, sans-serif">
+                                                        <MenuItem Header="Set Breakpoint" Click="OnSetBreakpointClick" Padding="8,3" />
+                                                    </ContextMenu>
+                                                </Border.ContextMenu>
+                                            <ItemsControl ItemsSource="{Binding Tokens}" x:CompileBindings="False"
+                                                          Background="{Binding IsCurrent, Converter={x:Static cnv:HighlightConverters.CurrentBg}}">
+                                                <ItemsControl.ItemsPanel>
+                                                    <ItemsPanelTemplate>
+                                                        <StackPanel Orientation="Horizontal" />
+                                                    </ItemsPanelTemplate>
+                                                </ItemsControl.ItemsPanel>
+                                                <ItemsControl.ItemTemplate>
+                                                    <DataTemplate x:DataType="core:Token">
+                                                        <TextBlock Text="{Binding Text}"
+                                                                   FontSize="12"
+                                                                   FontFamily="Cascadia Code, Consolas, Menlo, monospace"
+                                                                   Foreground="{Binding Color, Converter={x:Static cnv:HighlightConverters.HexToBrush}}" />
+                                                    </DataTemplate>
+                                                </ItemsControl.ItemTemplate>
+                                            </ItemsControl>
+                                            </Border>
+                                        </DataTemplate>
+                                    </ItemsControl.ItemTemplate>
+                                </ItemsControl>
+                            </StackPanel>
+                        </Border>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </ScrollViewer>
+    </Grid>
+
+    <UserControl.Styles>
+        <Style Selector="Button.start">
+            <Setter Property="Background" Value="#1A3A1A" />
+            <Setter Property="Foreground" Value="#4CAF50" />
+            <Setter Property="FontWeight" Value="Bold" />
+        </Style>
+        <Style Selector="Button.debug">
+            <Setter Property="Background" Value="#2A3A2A" />
+            <Setter Property="Foreground" Value="#81C784" />
+        </Style>
+        <Style Selector="Button.stop">
+            <Setter Property="Background" Value="#3A2A2A" />
+            <Setter Property="Foreground" Value="#EF5350" />
+        </Style>
+    </UserControl.Styles>
+</UserControl>

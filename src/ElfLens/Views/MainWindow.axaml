@@ -12,101 +12,105 @@
         <vm:MainViewModel/>
     </Design.DataContext>
 
+    <Window.Styles>
+        <Style Selector="TabItem" x:DataType="vm:PanelViewModel">
+            <Setter Property="Header" Value="{Binding Title}" />
+            <Setter Property="FontSize" Value="11" />
+        </Style>
+    </Window.Styles>
+
     <Grid RowDefinitions="Auto,*">
 
         <!-- Status Bar -->
         <Border Grid.Row="0" Padding="12,6"
                 Background="{DynamicResource SystemAltHighBrush}">
-            <Grid ColumnDefinitions="Auto,*">
-                <StackPanel Orientation="Horizontal" Spacing="8">
-                    <!-- Connection indicator -->
-                    <Ellipse Width="10" Height="10" Fill="#4CAF50"
-                             IsVisible="{Binding IsConnected}" />
-                    <Ellipse Width="10" Height="10" Fill="#F44336"
-                             IsVisible="{Binding IsConnected, Converter={x:Static BoolConverters.Not}}" />
-                    <TextBlock Text="{Binding ConnectionStatus}"
-                               FontSize="12" VerticalAlignment="Center" />
-                </StackPanel>
-                <TextBlock Grid.Column="1" Text="ElfLens"
-                           FontSize="12" Foreground="{DynamicResource SystemAltHighBrush}"
-                           HorizontalAlignment="Right" VerticalAlignment="Center" />
-            </Grid>
+            <StackPanel Orientation="Horizontal" Spacing="8">
+                <Ellipse Width="10" Height="10" Fill="#4CAF50"
+                         IsVisible="{Binding IsConnected}" />
+                <Ellipse Width="10" Height="10" Fill="#F44336"
+                         IsVisible="{Binding IsConnected, Converter={x:Static BoolConverters.Not}}" />
+                <TextBlock Text="{Binding ConnectionStatus}"
+                           FontSize="12" VerticalAlignment="Center" />
+            </StackPanel>
         </Border>
 
-        <!-- Connect Page (visible when not connected) -->
+        <!-- Connect Page -->
         <ScrollViewer Grid.Row="1"
                       IsVisible="{Binding IsConnected, Converter={x:Static BoolConverters.Not}}">
             <ContentControl Content="{Binding ConnectPage}" />
         </ScrollViewer>
 
-        <!-- Workspace (visible when connected) -->
+        <!-- Workspace -->
         <Grid Grid.Row="1"
               IsVisible="{Binding IsConnected}"
               ColumnDefinitions="220,4,*,4,220"
-              RowDefinitions="*,4,180">
+              RowDefinitions="*,4,200">
 
-            <!-- Left Tool Panel -->
-            <Border Grid.Column="0" Grid.Row="0"
-                    Background="{DynamicResource SystemAltMediumLowBrush}"
-                    Padding="8">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="TOOLS" FontSize="10"
-                               Foreground="{DynamicResource SystemBaseMediumColorBrush}" />
-                    <TextBlock Text="Panels will appear here"
-                               FontSize="12" Opacity="0.6"
-                               TextWrapping="Wrap" />
-                </StackPanel>
-            </Border>
+            <!-- Left panels -->
+            <TabControl Grid.Column="0" Grid.Row="0"
+                        ItemsSource="{Binding LeftPanels}"
+                        Background="{DynamicResource SystemAltMediumLowBrush}">
+                <TabControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PanelViewModel">
+                        <ContentControl Content="{Binding}" />
+                    </DataTemplate>
+                </TabControl.ItemTemplate>
+            </TabControl>
 
-            <!-- Left Splitter -->
-            <GridSplitter Grid.Column="1" Grid.Row="0"
-                          Width="4" Background="Transparent"
-                          HorizontalAlignment="Stretch" />
+            <GridSplitter Grid.Column="1" Grid.Row="0" Width="5"
+                          Background="Transparent" HorizontalAlignment="Stretch" />
+            <Border Grid.Column="1" Grid.Row="0" Width="1"
+                    Background="#2A2A2A" HorizontalAlignment="Stretch"
+                    IsHitTestVisible="False" />
 
-            <!-- Center Document Area -->
-            <Border Grid.Column="2" Grid.Row="0"
-                    Background="{DynamicResource SystemAltHighBrush}"
-                    Padding="12">
-                <StackPanel VerticalAlignment="Center" HorizontalAlignment="Center" Spacing="8">
-                    <TextBlock Text="ElfLens" FontSize="24" FontWeight="Bold"
-                               Opacity="0.3" HorizontalAlignment="Center" />
-                    <TextBlock Text="Linux Binary Analysis Tool"
-                               FontSize="14" Opacity="0.3"
-                               HorizontalAlignment="Center" />
-                    <TextBlock Text="{Binding ConnectionHost}"
-                               FontSize="13" Opacity="0.4"
-                               HorizontalAlignment="Center" />
-                </StackPanel>
-            </Border>
+            <!-- Center panels -->
+            <TabControl Grid.Column="2" Grid.Row="0"
+                        ItemsSource="{Binding CenterPanels}"
+                        Background="{DynamicResource SystemAltHighBrush}">
+                <TabControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PanelViewModel">
+                        <ContentControl Content="{Binding}" />
+                    </DataTemplate>
+                </TabControl.ItemTemplate>
+            </TabControl>
 
-            <!-- Right Splitter -->
-            <GridSplitter Grid.Column="3" Grid.Row="0"
-                          Width="4" Background="Transparent"
-                          HorizontalAlignment="Stretch" />
+            <GridSplitter Grid.Column="3" Grid.Row="0" Width="5"
+                          Background="Transparent" HorizontalAlignment="Stretch" />
+            <Border Grid.Column="3" Grid.Row="0" Width="1"
+                    Background="#2A2A2A" HorizontalAlignment="Stretch"
+                    IsHitTestVisible="False" />
 
-            <!-- Right Tool Panel -->
-            <Border Grid.Column="4" Grid.Row="0"
-                    Background="{DynamicResource SystemAltMediumLowBrush}"
-                    Padding="8">
-                <StackPanel Spacing="8">
-                    <TextBlock Text="INSPECTOR" FontSize="10"
-                               Foreground="{DynamicResource SystemBaseMediumColorBrush}" />
-                    <TextBlock Text="Panels will appear here"
-                               FontSize="12" Opacity="0.6"
-                               TextWrapping="Wrap" />
-                </StackPanel>
-            </Border>
+            <!-- Right panels -->
+            <TabControl Grid.Column="4" Grid.Row="0"
+                        ItemsSource="{Binding RightPanels}"
+                        Background="{DynamicResource SystemAltMediumLowBrush}">
+                <TabControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PanelViewModel">
+                        <ContentControl Content="{Binding}" />
+                    </DataTemplate>
+                </TabControl.ItemTemplate>
+            </TabControl>
 
-            <!-- Horizontal Splitter -->
+            <!-- Horizontal splitter -->
             <GridSplitter Grid.Column="0" Grid.ColumnSpan="5"
-                          Grid.Row="1" Height="4"
-                          Background="Transparent"
-                          HorizontalAlignment="Stretch" />
+                          Grid.Row="1" Height="5"
+                          Background="Transparent" HorizontalAlignment="Stretch" />
+            <Border Grid.Column="0" Grid.ColumnSpan="5"
+                    Grid.Row="1" Height="1"
+                    Background="#2A2A2A" HorizontalAlignment="Stretch"
+                    IsHitTestVisible="False" />
 
-            <!-- Bottom Output Panel — Shell -->
-            <ContentControl Grid.Column="0" Grid.ColumnSpan="5"
-                            Grid.Row="2"
-                            Content="{Binding ShellPanel}" />
+            <!-- Bottom panels -->
+            <TabControl Grid.Column="0" Grid.ColumnSpan="5" Grid.Row="2"
+                        ItemsSource="{Binding BottomPanels}"
+                        SelectedItem="{Binding SelectedBottomPanel}"
+                        Background="{DynamicResource SystemAltMediumLowBrush}">
+                <TabControl.ItemTemplate>
+                    <DataTemplate x:DataType="vm:PanelViewModel">
+                        <ContentControl Content="{Binding}" />
+                    </DataTemplate>
+                </TabControl.ItemTemplate>
+            </TabControl>
 
         </Grid>
 

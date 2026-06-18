@@ -1,7 +1,8 @@
 using System;
+using System.Collections.ObjectModel;
+using System.Linq;
 using System.Threading.Tasks;
 using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using ElfLens.Core.Models;
 using ElfLens.Core.Services;
 
@@ -11,28 +12,87 @@ public partial class MainViewModel : ViewModelBase
 {
     private readonly ISshService _sshService;
 
-    [ObservableProperty]
-    private bool _isConnected;
-
-    [ObservableProperty]
-    private string _connectionStatus = "Disconnected";
-
-    [ObservableProperty]
-    private string _connectionHost = string.Empty;
-
-    [ObservableProperty]
-    private string _targetBinary = string.Empty;
+    [ObservableProperty] private bool _isConnected;
+    [ObservableProperty] private string _connectionStatus = "Disconnected";
+    [ObservableProperty] private string _connectionHost = string.Empty;
+    [ObservableProperty] private string _targetBinary = string.Empty;
+    [ObservableProperty] private PanelViewModel? _selectedBottomPanel;
 
     public ConnectPageViewModel ConnectPage { get; }
-    public WorkspaceViewModel Workspace { get; }
     public ShellPanelViewModel ShellPanel { get; }
+    public FileInfoPanelViewModel FileInfoPanel { get; }
+    public DisassemblyPanelViewModel DisassemblyPanel { get; }
+    public GdbDisasmPanelViewModel GdbDisasmPanel { get; }
+    public BreakpointPanelViewModel BreakpointPanel { get; }
+    public RegistersPanelViewModel RegistersPanel { get; }
+    public StackPanelViewModel StackPanel { get; }
+
+    public ObservableCollection<PanelViewModel> LeftPanels { get; } = new();
+    public ObservableCollection<PanelViewModel> CenterPanels { get; } = new();
+    public ObservableCollection<PanelViewModel> RightPanels { get; } = new();
+    public ObservableCollection<PanelViewModel> BottomPanels { get; } = new();
+
+    private ShellPanelViewModel? _gdbShellPanel;
 
     public MainViewModel()
     {
         _sshService = new SshService();
         ConnectPage = new ConnectPageViewModel(_sshService, OnConnectionSucceeded);
         ShellPanel = new ShellPanelViewModel(_sshService);
-        Workspace = new WorkspaceViewModel();
+        FileInfoPanel = new FileInfoPanelViewModel(_sshService);
+        DisassemblyPanel = new DisassemblyPanelViewModel(_sshService);
+        GdbDisasmPanel = new GdbDisasmPanelViewModel(_sshService, DisassemblyPanel);
+        BreakpointPanel = new BreakpointPanelViewModel();
+        RegistersPanel = new RegistersPanelViewModel();
+        StackPanel = new StackPanelViewModel();
+
+        BottomPanels.Add(ShellPanel);
+        LeftPanels.Add(RegistersPanel);
+        LeftPanels.Add(StackPanel);
+        RightPanels.Add(FileInfoPanel);
+        RightPanels.Add(BreakpointPanel);
+        CenterPanels.Add(DisassemblyPanel);
+        CenterPanels.Add(GdbDisasmPanel);
+
+        // Notify breakpoints changed → update marks on both panels
+        void ReMark()
+        {
+            var bps = BreakpointPanel.GetFuncBreakpoints();
+            DisassemblyPanel.MarkBreakpoints(bps);
+            GdbDisasmPanel.MarkBreakpoints(bps);
+        }
+        BreakpointPanel.OnChanged(ReMark);
+        GdbDisasmPanel.BlocksChanged += ReMark;
+
+        // Route right-click breakpoint requests from disassembly panels
+        DisassemblyPanel.BreakpointRequested += (func, offset) =>
+            BreakpointPanel.AddFromDisasm(func, offset);
+        GdbDisasmPanel.BreakpointRequested += (func, offset) =>
+            BreakpointPanel.AddFromDisasm(func, offset);
+
+        GdbDisasmPanel.SessionChanged += (session, title) =>
+        {
+            if (session != null)
+            {
+                _gdbShellPanel = new ShellPanelViewModel(session, title);
+                BottomPanels.Add(_gdbShellPanel);
+                SelectedBottomPanel = _gdbShellPanel;
+                BreakpointPanel.SetSession(session);
+                RegistersPanel.SetSession(session);
+                StackPanel.SetSession(session);
+            }
+            else
+            {
+                if (_gdbShellPanel != null)
+                {
+                    BottomPanels.Remove(_gdbShellPanel);
+                    _gdbShellPanel = null;
+                }
+                BreakpointPanel.SetSession(null);
+                RegistersPanel.SetSession(null);
+                StackPanel.SetSession(null);
+            }
+        };
     }
 
     private async void OnConnectionSucceeded(SshConnectionInfo info)
@@ -42,10 +102,38 @@ public partial class MainViewModel : ViewModelBase
         ConnectionStatus = $"Connecting to {info.Host}...";
         IsConnected = true;
 
-        // Initialize the shell panel in the background
-        await Task.Delay(500); // Brief delay for UI to render
+        await Task.Delay(500);
         await ShellPanel.InitializeCommand.ExecuteAsync(null);
 
         ConnectionStatus = $"Connected to {info.Host}";
+
+        FileInfoPanel.TargetPath = info.TargetBinaryPath;
+        DisassemblyPanel.TargetPath = info.TargetBinaryPath;
+        GdbDisasmPanel.TargetPath = info.TargetBinaryPath;
+        await Task.WhenAll(
+            FileInfoPanel.RefreshCommand.ExecuteAsync(null),
+            DisassemblyPanel.RefreshCommand.ExecuteAsync(null));
+    }
+
+    public void AddPanel(PanelViewModel panel)
+    {
+        switch (panel.Zone)
+        {
+            case PanelZone.Left: LeftPanels.Add(panel); break;
+            case PanelZone.Center: CenterPanels.Add(panel); break;
+            case PanelZone.Right: RightPanels.Add(panel); break;
+            case PanelZone.Bottom: BottomPanels.Add(panel); break;
+        }
+    }
+
+    public void RemovePanel(PanelViewModel panel)
+    {
+        switch (panel.Zone)
+        {
+            case PanelZone.Left: LeftPanels.Remove(panel); break;
+            case PanelZone.Center: CenterPanels.Remove(panel); break;
+            case PanelZone.Right: RightPanels.Remove(panel); break;
+            case PanelZone.Bottom: BottomPanels.Remove(panel); break;
+        }
     }
 }
