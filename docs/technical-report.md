@@ -1,135 +1,133 @@
-# ElfLens Technical Report
+# ElfLens 技术报告
 
-> Version 0.1.0 — A Cross-Platform GDB Frontend for Remote Linux Binary Analysis
-
----
-
-## 1. Project Overview
-
-ElfLens is a desktop application providing a graphical frontend for the GNU Debugger (GDB) over SSH. It enables security researchers and reverse engineers to inspect ELF binaries and debug them remotely through a modern, dark-themed UI built on Avalonia. The application connects to a Linux host via SSH, presents disassembly with syntax highlighting, manages breakpoints visually, and provides real-time register and stack inspection — all without leaving the GUI.
-
-**Target users**: Binary analysts, CTF participants, vulnerability researchers, and embedded systems developers who need a lightweight, cross-platform GDB interface.
+> 版本 0.1.0 — 跨平台 GDB 远程调试前端
 
 ---
 
-## 2. Technology Stack
+## 1. 项目概述
 
-| Layer               | Technology                          |
-|---------------------|-------------------------------------|
-| UI Framework        | Avalonia 11 (Fluent Dark Theme)     |
-| Runtime             | .NET 10                             |
-| MVVM Framework      | CommunityToolkit.Mvvm 8.x           |
-| SSH Library         | SSH.NET (Renci.SshNet) 2024.x       |
-| Language            | C# 12                               |
-| Build System        | .NET SDK / MSBuild                  |
-| License             | GNU General Public License v3.0     |
-
-**Runtime dependencies**: .NET 10 Runtime on the client machine. Remote host requires SSH server, GDB, GNU binutils (objdump, readelf), and optionally pwndbg for enhanced stack visualization.
+ElfLens 是一款基于 Avalonia UI 的桌面端 GDB 图形化前端，通过 SSH 远程连接 Linux 主机，提供反汇编浏览、断点管理、寄存器查看、调用栈分析等功能。目标用户为二进制分析师、CTF 参赛者、漏洞研究人员及嵌入式系统开发者。
 
 ---
 
-## 3. Project Structure
+## 2. 技术栈
 
-### 3.1 Namespace Hierarchy
+| 层次 | 技术 |
+|------|------|
+| UI 框架 | Avalonia 11（Fluent Dark 主题） |
+| 运行时 | .NET 10 |
+| MVVM 框架 | CommunityToolkit.Mvvm 8.x |
+| SSH 库 | SSH.NET（Renci.SshNet）2024.x |
+| 编程语言 | C# 12 |
+| 构建系统 | .NET SDK / MSBuild |
+| 许可证 | GNU General Public License v3.0 |
+
+**运行依赖**：客户端需安装 .NET 10 Runtime。远程主机需开启 SSH 服务，安装 GDB、GNU binutils（objdump、readelf），可选安装 pwndbg 以获得增强的栈可视化效果。
+
+---
+
+## 3. 项目结构
+
+### 3.1 命名空间层次
 
 ```
-ElfLens (Presentation Layer)
-├── Views                — Avalonia UserControl/Window, .axaml markup + code-behind
-├── Converters           — IValueConverter implementations for data binding
-├── App.axaml            — Application entry, Fluent Dark theme, ViewLocator registration
-├── ViewLocator.cs       — IDataTemplate: ViewModel → View resolution by naming convention
-└── Program.cs           — .NET application entry point
+ElfLens（表现层）
+├── Views                — Avalonia UserControl/Window，.axaml 标记 + code-behind
+├── Converters           — 数据绑定用 IValueConverter 实现
+├── App.axaml            — 应用入口，Fluent Dark 主题，ViewLocator 注册
+├── ViewLocator.cs       — IDataTemplate：按命名约定将 ViewModel 映射到 View
+└── Program.cs           — .NET 应用入口点
 
-ElfLens.Core (Logic Layer)
-├── Models               — Domain objects (SshConnectionInfo, ShellSession)
-├── Services             — Service interfaces and implementations (ISshService, SshService)
-├── ViewModels           — MVVM ViewModels, organized by panel and role
-├── DisassemblyHighlighter.cs — Tokenizer for objdump/GDB disassembly output
-├── StackHighlighter.cs       — Tokenizer for GDB stack/memory dump output
-└── RegisterNames.cs          — Shared x86/x86_64 register name constants
+ElfLens.Core（逻辑层）
+├── Models               — 领域对象（SshConnectionInfo、ShellSession）
+├── Services             — 服务接口与实现（ISshService、SshService）
+├── ViewModels           — MVVM 视图模型，按面板和角色组织
+├── DisassemblyHighlighter.cs — objdump/GDB 反汇编输出分词器
+├── StackHighlighter.cs       — GDB 栈/内存转储输出分词器
+└── RegisterNames.cs          — 共享的 x86/x86_64 寄存器名称常量
 ```
 
-### 3.2 Key Files
+### 3.2 核心文件
 
-| File | Lines | Purpose |
-|------|-------|---------|
-| `MainViewModel.cs` | ~120 | Application shell, panel wiring, event routing |
-| `GdbDisasmPanelViewModel.cs` | ~320 | GDB interactive debugging, disassembly, step control |
-| `ShellSession.cs` | ~100 | SSH shell stream wrapper, async command/response |
-| `DisassemblyPanelViewModel.cs` | ~150 | Static objdump disassembly with breakpoint marking |
-| `BreakpointPanelViewModel.cs` | ~170 | Breakpoint CRUD, GDB command execution |
-| `StackPanelViewModel.cs` | ~150 | Call stack frames with collapsible memory dump |
-| `DisassemblyHighlighter.cs` | ~120 | Tokenizer for x86 disassembly lines |
-| `StackHighlighter.cs` | ~180 | Tokenizer for pwndbg stack / GDB x/gx output |
-| `SshService.cs` | ~130 | SSH.NET wrapper: connect, execute, shell creation |
+| 文件 | 行数 | 用途 |
+|------|------|------|
+| `MainViewModel.cs` | ~120 | 应用壳，面板装配，事件路由 |
+| `GdbDisasmPanelViewModel.cs` | ~320 | GDB 交互调试、反汇编、步进控制 |
+| `ShellSession.cs` | ~100 | SSH 壳流封装，异步命令/响应 |
+| `DisassemblyPanelViewModel.cs` | ~150 | objdump 静态反汇编与断点标记 |
+| `BreakpointPanelViewModel.cs` | ~170 | 断点增删改查，GDB 命令执行 |
+| `StackPanelViewModel.cs` | ~150 | 调用栈帧，可折叠的内存转储 |
+| `DisassemblyHighlighter.cs` | ~120 | x86 反汇编行的分词着色 |
+| `StackHighlighter.cs` | ~180 | pwndbg stack / GDB x/gx 输出分词着色 |
+| `SshService.cs` | ~130 | SSH.NET 封装：连接、执行、Shell 创建 |
 
 ---
 
-## 4. Architecture
+## 4. 架构设计
 
-### 4.1 Layered Architecture
+### 4.1 分层架构
 
 ```
 ┌─────────────────────────────────────────┐
-│  Presentation Layer (ElfLens)           │
+│  表现层 (ElfLens)                        │
 │  Views (.axaml) ← Converters            │
-│       ↕ Data Binding                    │
+│       ↕ 数据绑定                         │
 ├─────────────────────────────────────────┤
-│  ViewModel Layer (ElfLens.Core)         │
-│  MainViewModel → Panel VMs              │
-│       ↕ Method Calls                    │
+│  视图模型层 (ElfLens.Core.ViewModels)     │
+│  MainViewModel → 各面板 ViewModel        │
+│       ↕ 方法调用                         │
 ├─────────────────────────────────────────┤
-│  Service Layer (ElfLens.Core.Services)  │
+│  服务层 (ElfLens.Core.Services)          │
 │  ISshService → SshService               │
-│       ↕ Stream I/O                      │
+│       ↕ 流 I/O                          │
 ├─────────────────────────────────────────┤
-│  Model Layer (ElfLens.Core.Models)      │
-│  ShellSession, SshConnectionInfo        │
+│  模型层 (ElfLens.Core.Models)            │
+│  ShellSession、SshConnectionInfo         │
 └─────────────────────────────────────────┘
 ```
 
-Data flows downward (ViewModel → Service → Model) for commands, and upward (Model → Service → ViewModel → View) for responses via events and observable properties.
+数据沿"视图模型→服务→模型"方向向下传递命令，沿"模型→服务→视图模型→视图"方向通过事件和可观察属性向上传递响应。
 
-### 4.2 MVVM Pattern
+### 4.2 MVVM 模式
 
-ElfLens follows the Model-View-ViewModel pattern using CommunityToolkit.Mvvm:
+ElfLens 使用 CommunityToolkit.Mvvm 实现 Model-View-ViewModel 模式：
 
-- **Models**: `SshConnectionInfo`, `ShellSession` — encapsulate SSH state and I/O
-- **ViewModels**: Subclasses of `ViewModelBase` (which extends `ObservableObject`) — expose bindable properties and commands via `[ObservableProperty]` and `[RelayCommand]` source generators
-- **Views**: Avalonia `UserControl` subclasses — bind to ViewModels via `{Binding}` markup extensions
+- **模型**：`SshConnectionInfo`、`ShellSession` — 封装 SSH 状态和 I/O
+- **视图模型**：继承 `ViewModelBase`（扩展 `ObservableObject`）— 通过 `[ObservableProperty]` 和 `[RelayCommand]` 源代码生成器暴露可绑定属性和命令
+- **视图**：Avalonia `UserControl` 子类 — 通过 `{Binding}` 标记扩展绑定到视图模型
 
-The `ViewLocator` resolves ViewModels to Views by naming convention: `XxxViewModel` → `XxxView` (e.g., `RegistersPanelViewModel` → `RegistersPanelView`).
+`ViewLocator` 按命名约定解析视图模型到视图：`XxxViewModel` → `XxxView`（例如 `RegistersPanelViewModel` → `RegistersPanelView`）。
 
 ---
 
-## 5. Class Hierarchy
+## 5. 类层次结构
 
-### 5.1 ViewModel Inheritance Tree
+### 5.1 视图模型继承树
 
 ```
 CommunityToolkit.Mvvm.ComponentModel.ObservableObject
 └── ViewModelBase                          (ElfLens.Core.ViewModels)
-    ├── ConnectPageViewModel               SSH connection form logic
+    ├── ConnectPageViewModel               SSH 连接表单逻辑
     │
-    └── PanelViewModel (abstract)          Docking panel base
-        │   Properties: Title, Zone
+    └── PanelViewModel (abstract)          可停靠面板基类
+        │   属性: Title, Zone
         │
-        ├── SessionPanelViewModel (abstract)  GDB session-aware panel
-        │   Properties: Session, HasSession
-        │   Method: SetSession(ShellSession?)
-        │   ├── BreakpointPanelViewModel   Breakpoint management
-        │   ├── RegistersPanelViewModel    CPU register display
-        │   └── StackPanelViewModel        Call stack with memory dump
+        ├── SessionPanelViewModel (abstract)  持有 GDB 会话的面板
+        │   属性: Session, HasSession
+        │   方法: SetSession(ShellSession?)
+        │   ├── BreakpointPanelViewModel   断点管理
+        │   ├── RegistersPanelViewModel    CPU 寄存器显示
+        │   └── StackPanelViewModel        调用栈与内存转储
         │
-        ├── ShellPanelViewModel            Interactive terminal
-        ├── FileInfoPanelViewModel         ELF file inspection
-        ├── DisassemblyPanelViewModel      Static objdump disassembly
-        └── GdbDisasmPanelViewModel        GDB interactive debugging
+        ├── ShellPanelViewModel            交互式终端
+        ├── FileInfoPanelViewModel         ELF 文件检测
+        ├── DisassemblyPanelViewModel      objdump 静态反汇编
+        └── GdbDisasmPanelViewModel        GDB 交互式调试
 
-MainViewModel (composes all panel VMs, wires events)
+MainViewModel (组合全部面板 VM，连接事件)
 ```
 
-### 5.2 Panel Hierarchy
+### 5.2 面板层次
 
 ```
 PanelViewModel (abstract)
@@ -143,26 +141,26 @@ MainViewModel
   └── BottomPanels: ObservableCollection<PanelViewModel>
 ```
 
-### 5.3 Data Records
+### 5.3 数据记录类型
 
 ```
-Token(text, color, navigateTo?)
-HighlightedLine(tokens, isCurrent?, isBreakpoint?, isBreakpointDisabled?)
-FunctionItem(name, address, instructions) : ObservableObject
+Token(Text, Color, NavigateTo?)               (record)
+HighlightedLine(Tokens, IsCurrent?, IsBreakpoint?, IsBreakpointDisabled?)  (record)
+FunctionItem(Name, Address, Instructions) : ObservableObject
   └── IsExpanded, IsCurrent, ToggleCommand
 
-RegisterEntry(name, hexValue, decValue)           (record)
-StackFrameItem(frameNum, function, address, rawLine) : ObservableObject
+RegisterEntry(Name, HexValue, DecValue)       (record)
+StackFrameItem(FrameNum, Function, Address, RawLine) : ObservableObject
   └── IsExpanded, IsLoading, MemoryLines
-BreakpointEntry(location) : ObservableObject
+BreakpointEntry(Location) : ObservableObject
   └── Enabled, GdbNum, ResolvedAddr, ResolvedFunc
 ```
 
 ---
 
-## 6. Core Interfaces & Services
+## 6. 核心接口与服务
 
-### 6.1 `ISshService` Interface
+### 6.1 `ISshService` 接口
 
 ```csharp
 public interface ISshService
@@ -170,46 +168,46 @@ public interface ISshService
     bool IsConnected { get; }
     SshConnectionInfo? ConnectionInfo { get; }
 
-    Task<bool> ConnectAsync(SshConnectionInfo info);
-    Task DisconnectAsync();
-    Task<string> ExecuteCommandAsync(string command);     // Non-interactive
-    Task<ShellSession?> CreateShellSessionAsync();         // Interactive shell
+    Task<bool> ConnectAsync(SshConnectionInfo info);     // 建立连接
+    Task DisconnectAsync();                               // 断开连接
+    Task<string> ExecuteCommandAsync(string command);     // 非交互式命令
+    Task<ShellSession?> CreateShellSessionAsync();         // 交互式 Shell
 }
 ```
 
-`SshService` implements `ISshService` and `IDisposable`. It wraps an SSH.NET `SshClient` and provides:
-- Connection lifecycle management
-- Single-command execution via SSH.NET `CreateCommand()` with 30s timeout
-- Shell session creation via `CreateShellStream()` with terminal emulation (xterm-256color, 200×40)
-- Automatic cleanup on disconnect
+`SshService` 实现了 `ISshService` 和 `IDisposable`。它封装了 SSH.NET 的 `SshClient`，提供：
+- 连接生命周期管理
+- 通过 SSH.NET `CreateCommand()` 执行单条命令，超时 30 秒
+- 通过 `CreateShellStream()` 创建交互式 Shell 会话，启用终端模拟（xterm-256color，200×40）
+- 断开时自动清理
 
-### 6.2 `ShellSession` Class
+### 6.2 `ShellSession` 类
 
-The core abstraction for GDB interaction:
+与 GDB 交互的核心抽象：
 
 ```csharp
 public class ShellSession : IDisposable
 {
-    public event Action<string>? OnOutput;              // Raw output chunks
+    public event Action<string>? OnOutput;              // 原始输出数据块
 
-    public async Task SendCommandAsync(string command);  // Write to shell
-    public async Task<string> CaptureOutputAsync(        // Send + await response
+    public async Task SendCommandAsync(string command);  // 写入 Shell
+    public async Task<string> CaptureOutputAsync(        // 发送并等待响应
         string command, int timeoutMs = 800,
         Func<string, bool>? stopPredicate = null);
 
-    public void Dispose();                               // Cancel read loop, dispose stream
+    public void Dispose();                               // 取消读取循环，释放流
 }
 ```
 
-**`CaptureOutputAsync`** is the unified command/response pattern used by all panels. It:
-1. Subscribes to `OnOutput`
-2. Sends the command via `SendCommandAsync`
-3. Waits until either: the stop predicate matches, the GDB prompt (`(gdb)`/`pwndbg>`) appears, output exceeds 8000 chars, or timeout expires
-4. Unsubscribes and returns the accumulated output
+**`CaptureOutputAsync`** 是所有面板使用的统一命令/响应模式。其工作流程：
+1. 订阅 `OnOutput` 事件
+2. 通过 `SendCommandAsync` 发送命令
+3. 等待以下任一条件满足：停止谓词匹配、GDB 提示符出现（`(gdb)`/`pwndbg>`）、输出超过 8000 字符、超时到期
+4. 取消订阅，返回累积的输出字符串
 
-This pattern eliminates ~100 lines of duplicated capture logic across the codebase.
+该模式消除了代码库中约 100 行重复的捕获逻辑。
 
-### 6.3 `ViewModelBase` and `PanelViewModel`
+### 6.3 `ViewModelBase` 和 `PanelViewModel`
 
 ```csharp
 public abstract class ViewModelBase : ObservableObject { }
@@ -228,96 +226,96 @@ public abstract class SessionPanelViewModel : PanelViewModel
 }
 ```
 
-### 6.4 `IDataTemplate` (ViewLocator)
+### 6.4 `IDataTemplate`（ViewLocator）
 
 ```csharp
 public class ViewLocator : IDataTemplate
 {
     public Control? Build(object? param);  // ElfLens.Core.ViewModels.XxxViewModel
                                            // → ElfLens.Views.XxxView
-    public bool Match(object? data);       // true if data is ViewModelBase
+    public bool Match(object? data);       // data 是 ViewModelBase 时返回 true
 }
 ```
 
 ---
 
-## 7. Data Flow
+## 7. 数据流
 
-### 7.1 Connection Flow
+### 7.1 连接流程
 
 ```
-User → ConnectPageView (form) → ConnectPageViewModel.ConnectAsync()
+用户 → ConnectPageView（表单）→ ConnectPageViewModel.ConnectAsync()
   → SshService.ConnectAsync(info) → SSH.NET SshClient.Connect()
   → MainViewModel.OnConnectionSucceeded()
-    → ShellPanel.InitializeAsync()           (general SSH shell)
-    → FileInfoPanel.RefreshAsync()            (ELF inspection)
-    → DisassemblyPanel.RefreshAsync()         (static objdump)
+    → ShellPanel.InitializeAsync()           （通用 SSH Shell）
+    → FileInfoPanel.RefreshAsync()            （ELF 文件检测）
+    → DisassemblyPanel.RefreshAsync()         （静态反汇编）
 ```
 
-### 7.2 Debugging Flow
+### 7.2 调试启动流程
 
 ```
-User → GdbDisasmPanelView → StartDebuggingCommand
-  → SshService.CreateShellSessionAsync() → ShellSession (GDB)
+用户 → GdbDisasmPanelView → StartDebuggingCommand
+  → SshService.CreateShellSessionAsync() → ShellSession（GDB）
   → ShellSession.SendCommandAsync("gdb -q <binary>")
-  → ShellSession.SendCommandAsync("run")     (start execution)
-  → SessionChanged event → MainViewModel
-    → BreakpointPanel.SetSession(session)     (apply stored breakpoints)
+  → ShellSession.SendCommandAsync("run")     （开始执行）
+  → SessionChanged 事件 → MainViewModel
+    → BreakpointPanel.SetSession(session)     （应用已存储的断点）
     → RegistersPanel.SetSession(session)
     → StackPanel.SetSession(session)
     → BottomPanels.Add(gdbShellPanel)
-    → SelectedBottomPanel = gdbShellPanel     (auto-switch to GDB tab)
+    → SelectedBottomPanel = gdbShellPanel     （自动切到 GDB 标签页）
 ```
 
-### 7.3 Step Flow
+### 7.3 单步执行流程
 
 ```
-User → Step Into / Step Over / Continue
+用户 → Step Into / Step Over / Continue
   → GdbDisasmPanelViewModel.Step("stepi"/"nexti"/"continue")
   → ShellSession.SendCommandAsync(cmd)
   → RefreshAsync()
-    → info registers pc  →  parse PC address
-    → disassemble /r      →  parse GDB assembly  →  FunctionBlocks
-    → UpdateHighlight     →  highlight current instruction
+    → info registers pc  →  解析 PC 地址
+    → disassemble /r      →  解析 GDB 汇编 → FunctionBlocks
+    → UpdateHighlight     →  高亮当前指令
 ```
 
-### 7.4 Breakpoint Flow
+### 7.4 断点流程
 
 ```
-User → Add/Toggle/Remove button OR right-click "Set Breakpoint"
+用户 → Add/Toggle/Remove 按钮 或 右键 "Set Breakpoint"
   → BreakpointPanelViewModel.{Add,Toggle,Remove}()
   → ShellSession.SendCommandAsync("break/enable/disable/delete")
-  → ShellSession.CaptureOutputAsync → parse GDB response
+  → ShellSession.CaptureOutputAsync → 解析 GDB 响应
   → NotifyChanged() → MainViewModel.ReMark()
     → BreakpointPanel.GetFuncBreakpoints()
-    → MarkBreakpoints(Functions, bps)          (static method)
-    → MarkBreakpoints(FunctionBlocks, bps)     (GDB panel)
+    → MarkBreakpoints(Functions, bps)          （静态面板）
+    → MarkBreakpoints(FunctionBlocks, bps)     （GDB 面板）
 ```
 
-### 7.5 Stack Memory Flow
+### 7.5 栈内存查看流程
 
 ```
-User → Expand frame
+用户 → 展开栈帧
   → StackPanelViewModel.ToggleFrameAsync(frame)
-    → ShellSession.CaptureOutputAsync("frame N")    (switch context)
-    → ShellSession.CaptureOutputAsync("info frame")  (get boundaries)
-    → ShellSession.CaptureOutputAsync("stack N")     (pwndbg) or x/Ngx (fallback)
-    → ShellSession.CaptureOutputAsync("frame 0")     (restore context)
+    → ShellSession.CaptureOutputAsync("frame N")     （切换上下文）
+    → ShellSession.CaptureOutputAsync("info frame")   （获取帧边界）
+    → ShellSession.CaptureOutputAsync("stack N")      （pwndbg）或 x/Ngx（回退）
+    → ShellSession.CaptureOutputAsync("frame 0")      （恢复上下文）
     → StackHighlighter.Tokenize(lines) → MemoryLines
 ```
 
 ---
 
-## 8. Panel Layout
+## 8. 面板布局
 
 ```
 ┌──────────────────┬──────────────────────────────┬──────────────────┐
-│   LEFT (220px)   │        CENTER (flex)          │   RIGHT (220px)  │
+│   左侧 (220px)    │        中部 (自适应)          │   右侧 (220px)    │
 │                  │                               │                  │
 │  ┌─ Registers ─┐ │  ┌─ Disassembly ───────────┐ │  ┌─ File Info ─┐ │
-│  │ rax  0x...  │ │  │ 401000 <_start>:        │ │  │ ELF Headers │ │
-│  │ rbx  0x...  │ │  │   endbr64               │ │  │ Security    │ │
-│  │ rcx  0x...  │ │  │   push rbp              │ │  │ Sections    │ │
+│  │ rax  0x...  │ │  │ 401000 <_start>:        │ │  │ ELF 头部    │ │
+│  │ rbx  0x...  │ │  │   endbr64               │ │  │ 安全属性    │ │
+│  │ rcx  0x...  │ │  │   push rbp              │ │  │ 节区信息    │ │
 │  └─────────────┘ │  └─────────────────────────┘ │  └─────────────┘ │
 │                  │                               │                  │
 │  ┌─ Stack ─────┐ │  ┌─ GDB ───────────────────┐ │  ┌─ Breakpts ─┐ │
@@ -326,7 +324,7 @@ User → Expand frame
 │  │ #2 _start   │ │  │   mov eax, 0            │ │  │ Add: [___] │ │
 │  └─────────────┘ │  └─────────────────────────┘ │  └─────────────┘ │
 ├──────────────────┴──────────────────────────────┴──────────────────┤
-│   BOTTOM (200px)                                                   │
+│   底部 (200px)                                                      │
 │  ┌─ Shell ───────────────────┐ ┌─ GDB ───────────────────────────┐ │
 │  │ $ ls -la                  │ │ pwndbg> info registers          │ │
 │  │ ...                       │ │ ...                             │ │
@@ -336,104 +334,104 @@ User → Expand frame
 
 ---
 
-## 9. Event System
+## 9. 事件系统
 
-| Event | Source | Subscribers | Purpose |
-|-------|--------|-------------|---------|
-| `OnOutput` | `ShellSession` | Panel VMs | Raw shell output chunks |
-| `SessionChanged` | `GdbDisasmPanelViewModel` | `MainViewModel` | GDB session lifecycle |
-| `BreakpointRequested` | `DisassemblyPanelViewModel`, `GdbDisasmPanelViewModel` | `MainViewModel` | Right-click "Set Breakpoint" |
-| `BlocksChanged` | `GdbDisasmPanelViewModel` | `MainViewModel` | New function block added |
-| `NavigateToFunction` | `DisassemblyPanelViewModel` | View code-behind | Scroll to function |
-| `ScrollToBlock` | `GdbDisasmPanelViewModel` | View code-behind | Scroll to GDB block |
-| `OnChanged` (callback) | `BreakpointPanelViewModel` | `MainViewModel` | Breakpoints modified |
-
----
-
-## 10. Rendering Pipeline
-
-### 10.1 Disassembly Syntax Highlighting
-
-1. Raw output from `objdump -d` or GDB `disassemble /r`
-2. Split into lines → `DisassemblyHighlighter.Tokenize(line)` → `List<Token>`
-3. Each `Token` has `Text`, `Color` (hex string), optional `NavigateTo`
-4. `HighlightConverters.HexToBrush` converts hex colors to `SolidColorBrush`
-5. UI renders as horizontal `StackPanel` of colored `TextBlock` elements
-
-### 10.2 Stack Memory Highlighting
-
-1. Raw output from pwndbg `stack N` or GDB `x/Ngx`
-2. Split into lines → `StackHighlighter.Tokenize(line)` → `List<Token>`
-3. Same token rendering pipeline as disassembly
-
-### 10.3 Breakpoint Marking
-
-1. `BreakpointPanelViewModel.GetFuncBreakpoints()` returns `(func, offset, enabled)` tuples
-2. `FunctionItem.MarkBreakpoints()` iterates instructions, computes byte offset from function base
-3. `HighlightedLine.IsBreakpoint` (true) + `IsBreakpointDisabled` (false) → red left border
-4. `HighlightedLine.IsBreakpoint` (true) + `IsBreakpointDisabled` (true) → orange left border
-5. `HighlightConverters.BreakpointBorder` accepts the `HighlightedLine` object and returns the appropriate color
+| 事件 | 来源 | 订阅者 | 用途 |
+|------|------|--------|------|
+| `OnOutput` | `ShellSession` | 各面板 VM | 原始 Shell 输出数据块 |
+| `SessionChanged` | `GdbDisasmPanelViewModel` | `MainViewModel` | GDB 会话生命周期 |
+| `BreakpointRequested` | `DisassemblyPanelViewModel`、`GdbDisasmPanelViewModel` | `MainViewModel` | 右键"设置断点" |
+| `BlocksChanged` | `GdbDisasmPanelViewModel` | `MainViewModel` | 新函数块已添加 |
+| `NavigateToFunction` | `DisassemblyPanelViewModel` | View code-behind | 滚动到指定函数 |
+| `ScrollToBlock` | `GdbDisasmPanelViewModel` | View code-behind | 滚动到 GDB 块 |
+| `OnChanged`（回调） | `BreakpointPanelViewModel` | `MainViewModel` | 断点已修改 |
 
 ---
 
-## 11. Extension Guide
+## 10. 渲染管线
 
-### 11.1 Adding a New Panel
+### 10.1 反汇编语法高亮
 
-1. Create ViewModel in `ElfLens.Core/ViewModels/`:
+1. `objdump -d` 或 GDB `disassemble /r` 的原始输出
+2. 按行切分 → `DisassemblyHighlighter.Tokenize(line)` → `List<Token>`
+3. 每个 `Token` 包含 `Text`（文本）、`Color`（十六进制颜色字符串）、可选的 `NavigateTo`（导航目标）
+4. `HighlightConverters.HexToBrush` 将十六进制颜色转换为 `SolidColorBrush`
+5. UI 以横向 `StackPanel` 渲染，内含多个彩色 `TextBlock` 元素
+
+### 10.2 栈内存高亮
+
+1. pwndbg `stack N` 或 GDB `x/Ngx` 的原始输出
+2. 按行切分 → `StackHighlighter.Tokenize(line)` → `List<Token>`
+3. 使用与反汇编相同的 token 渲染管线
+
+### 10.3 断点标记
+
+1. `BreakpointPanelViewModel.GetFuncBreakpoints()` 返回 `(func, offset, enabled)` 元组
+2. `FunctionItem.MarkBreakpoints()` 遍历指令，从函数基址计算字节偏移
+3. `HighlightedLine.IsBreakpoint`（true）+ `IsBreakpointDisabled`（false）→ 红色左边框
+4. `HighlightedLine.IsBreakpoint`（true）+ `IsBreakpointDisabled`（true）→ 橙色左边框
+5. `HighlightConverters.BreakpointBorder` 接收整个 `HighlightedLine` 对象并返回对应颜色
+
+---
+
+## 11. 扩展指南
+
+### 11.1 新增面板
+
+1. 在 `ElfLens.Core/ViewModels/` 中创建视图模型：
    ```csharp
    public partial class MyPanelViewModel : SessionPanelViewModel
    {
-       public override string Title => "My Panel";
+       public override string Title => "我的面板";
        public override PanelZone Zone => PanelZone.Right;
-       // Add properties, commands, GDB interaction via Session.CaptureOutputAsync()
+       // 通过 Session.CaptureOutputAsync() 交互 GDB
    }
    ```
-2. Create View in `ElfLens/Views/`:
+2. 在 `ElfLens/Views/` 中创建视图：
    ```xml
    <UserControl x:Class="ElfLens.Views.MyPanelView"
                 x:DataType="vm:MyPanelViewModel">
-       <!-- UI markup -->
+       <!-- UI 标记 -->
    </UserControl>
    ```
-3. Register in `MainViewModel` constructor:
+3. 在 `MainViewModel` 构造函数中注册：
    ```csharp
    MyPanel = new MyPanelViewModel();
-   RightPanels.Add(MyPanel);  // or LeftPanels, CenterPanels, BottomPanels
+   RightPanels.Add(MyPanel);  // 或 LeftPanels、CenterPanels、BottomPanels
    ```
-4. Wire session in `SessionChanged` handler:
+4. 在 `SessionChanged` 处理器中连接会话：
    ```csharp
    MyPanel.SetSession(session);
    ```
 
-### 11.2 Adding a New GDB Query
+### 11.2 新增 GDB 查询
 
 ```csharp
 var output = await Session.CaptureOutputAsync("gdb-command");
-// Parse output with Regex, populate ObservableCollection
+// 用正则解析 output，填充 ObservableCollection
 ```
 
-### 11.3 Adding a New Tokenizer
+### 11.3 新增分词器
 
-Add a static class in `ElfLens.Core/` with a `Tokenize(string line)` method returning `List<Token>`. Each `Token` has text and a hex color string.
+在 `ElfLens.Core/` 中新增静态类，包含 `Tokenize(string line)` 方法，返回 `List<Token>`。每个 `Token` 包含文本和十六进制颜色字符串。
 
 ---
 
-## 12. Build & Deployment
+## 12. 构建与部署
 
 ```bash
-# Development build
+# 开发构建
 dotnet build
 
-# Release publish (self-contained optional)
-dotnet publish src/ElfLens/ElfLens.csproj -c Release -o publish/
+# 发布构建
+dotnet publish src/ElfLens/ElfLens.csproj -c Release -o release/
 
-# Output: publish/ElfLens.exe + dependencies
-# Requires .NET 10 Runtime on target machine
+# 输出：release/ElfLens.exe + 依赖项
+# 目标机器需安装 .NET 10 Runtime
 ```
 
-The published output is a framework-dependent deployment. Copy the entire `publish/` directory to any Windows, Linux, or macOS machine with .NET 10 Runtime installed. Run `ElfLens.exe` (Windows) or `dotnet ElfLens.dll` (Linux/macOS).
+发布输出为框架依赖部署。将整个 `release/` 目录复制到安装了 .NET 10 Runtime 的 Windows、Linux 或 macOS 机器上。Windows 下运行 `ElfLens.exe`，Linux/macOS 下运行 `dotnet ElfLens.dll`。
 
 ---
 
-*Document generated 2026-06-18 for ElfLens v0.1.0*
+*文档生成于 2026-06-18，适用于 ElfLens v0.1.0*
